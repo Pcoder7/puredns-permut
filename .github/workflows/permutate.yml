@@ -1,1 +1,335 @@
+name: Distributed PureDNS - Dispatcher
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # For creating matrix.json, artifacts, and potentially committing aggregated results
+  actions: write    # For triggering workflows in Account 2's repository
+
+env:
+  LINES_PER_CHUNK: 100000
+  PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
+  # Define Account 2 repo details here or get from secrets for more flexibility
+  ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'YourAccount2Username' }} # Fallback for testing
+  ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'YourAccount2WorkerRepoName' }} # Fallback for testing
+
+jobs:
+  prepare_all_chunks_and_package:
+    name: Prepare All Chunks & Package
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
+    outputs:
+      # Output 1: The full JSON matrix string of ALL generated chunks
+      all_chunks_matrix_json: ${{ steps.build_full_matrix.outputs.full_matrix }}
+      # Output 2: The total number of chunks generated
+      total_chunks_count: ${{ steps.build_full_matrix.outputs.total_chunks }}
+      # Output 3: The name of the artifact containing all chunks and resolvers
+      chunk_package_artifact_name: "all-chunks-package-${{ github.run_id }}"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: DEBUG - Verify Tools and Initial File System State
+        # ... (Your existing verification step - keep it, it's good!) ...
+        shell: bash
+        run: |
+          echo "DEBUG: Current directory: $(pwd)"
+          echo "DEBUG: Listing all files in repository root and subdirectories:"
+          find . -print
+          echo "-----------------------------------------------------"
+          echo "DEBUG: Specifically looking for subdomains.txt files:"
+          find . -type f -name 'subdomains.txt' -print || echo "DEBUG: 'find' for subdomains.txt failed or found nothing."
+          echo "-----------------------------------------------------"
+          echo "DEBUG: Checking for 'jq' command..."
+          if ! command -v jq &> /dev/null; then
+            echo "CRITICAL_ERROR: 'jq' command not found. This is essential. Aborting."
+            exit 1
+          else
+            echo "DEBUG: jq version: $(jq --version)"
+          fi
+          echo "-----------------------------------------------------"
+          echo "DEBUG: Checking for 'split' command..."
+          if ! command -v split &> /dev/null; then
+            echo "CRITICAL_ERROR: 'split' command not found. This is essential. Aborting."
+            exit 1
+          else
+            echo "DEBUG: split version information (if available):"
+            split --version || echo "DEBUG: Could not get split version."
+          fi
+          echo "-----------------------------------------------------"
+
+
+      - name: Build Full Matrix & Create Chunks
+        id: build_full_matrix
+        shell: bash
+        run: |
+          JSON_MATRIX='[]'
+          echo "INFO: Initializing matrix as: $JSON_MATRIX"
+          find . -type f -name "subdomains.txt" -print0 > found_files.tmp
+          files=()
+          while IFS= read -r -d $'\0' file_path_from_find; do
+            standardized_file_path=$(echo "$file_path_from_find" | sed 's|^\./||')
+            files+=("$standardized_file_path")
+          done < found_files.tmp
+          rm found_files.tmp
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "WARNING: No 'subdomains.txt' files found."
+            # Set outputs for graceful continuation or conditional skipping of later jobs
+            echo "full_matrix=[]" >> $GITHUB_OUTPUT
+            echo "total_chunks=0" >> $GITHUB_OUTPUT
+            exit 0 # Exit gracefully, so dependent jobs with 'if' conditions can react
+          fi
+
+          echo "INFO: Found ${#files[@]} 'subdomains.txt' file(s)."
+          for file_path in "${files[@]}"; do
+            domain_dir=$(dirname "$file_path")
+            if [ "$domain_dir" == "." ]; then domain=$(basename "$file_path" .txt); else domain=$(basename "$domain_dir"); fi
+            echo "INFO: Processing '$file_path' for domain '$domain'"
+            if [ ! -s "$file_path" ]; then echo "WARNING: File '$file_path' is empty. Skipping."; continue; fi
+            
+            mkdir -p "chunks/$domain"
+            split -l "$LINES_PER_CHUNK" -a 3 --numeric-suffixes=1 "$file_path" "chunks/$domain/chunk_"
+            if [ $? -ne 0 ]; then echo "ERROR: Split failed for $file_path"; continue; fi
+
+            CHUNK_COUNT_FOR_FILE=0
+            while IFS= read -r chunk_file; do
+              if [ -z "$chunk_file" ]; then continue; fi
+              JSON_MATRIX=$(printf '%s' "$JSON_MATRIX" | jq -c --arg d "$domain" --arg c "$chunk_file" '. + [{domain:$d,chunk:$c}]')
+              CHUNK_COUNT_FOR_FILE=$((CHUNK_COUNT_FOR_FILE + 1))
+            done < <(find "chunks/$domain/" -name 'chunk_*' -type f -print)
+            echo "INFO: Generated $CHUNK_COUNT_FOR_FILE chunks for $domain from $file_path"
+          done
+
+          TOTAL_CHUNKS=$(echo "$JSON_MATRIX" | jq 'length')
+          echo "INFO: Generated total $TOTAL_CHUNKS chunks. Matrix (first 200 chars): $(echo "$JSON_MATRIX" | head -c 200)"
+          
+          # Set step outputs
+          echo "full_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
+          echo "total_chunks=$TOTAL_CHUNKS" >> $GITHUB_OUTPUT
+
+      - name: Package All Chunks and Resolvers
+        id: package_chunks
+        if: steps.build_full_matrix.outputs.total_chunks > 0
+        shell: bash
+        run: |
+          ARTIFACT_NAME="all-chunks-package-${{ github.run_id }}"
+          echo "INFO: Preparing package '$ARTIFACT_NAME.tar.gz'..."
+          # Ensure resolvers.txt and resolvers-trusted.txt are present or created if needed
+          if [ ! -f resolvers.txt ]; then echo "WARNING: resolvers.txt not found, creating default." >&2; echo '1.1.1.1' > resolvers.txt; fi
+          if [ ! -f resolvers-trusted.txt ]; then echo "WARNING: resolvers-trusted.txt not found, creating empty." >&2; touch resolvers-trusted.txt; fi
+          
+          tar -czvf "$ARTIFACT_NAME.tar.gz" chunks resolvers.txt resolvers-trusted.txt full_matrix.json
+          # We also add full_matrix.json to the tarball so Account 2 can reconstruct its portion if needed,
+          # or Account 1 could send indices instead of the full secondary_matrix_json.
+          # For now, we'll still send secondary_matrix_json directly.
+          echo "$ARTIFACT_NAME.tar.gz created."
+          echo "package_filename=$ARTIFACT_NAME.tar.gz" >> $GITHUB_OUTPUT
+
+      - name: Upload Full Chunks Package
+        if: steps.build_full_matrix.outputs.total_chunks > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }} # Use dynamic name
+          path: ${{ steps.package_chunks.outputs.package_filename }}
+          retention-days: 2 # Keep it for a couple of days for Account 2 to pick up
+
+  distribute_and_trigger_secondary:
+    name: Distribute Work & Trigger Secondary
+    needs: prepare_all_chunks_and_package
+    if: needs.prepare_all_chunks_and_package.outputs.total_chunks_count > 0 # Only run if there are chunks
+    runs-on: ubuntu-latest
+    outputs:
+      primary_matrix_json: ${{ steps.calculate_distribution.outputs.primary_matrix }}
+      secondary_processing_triggered: ${{ steps.trigger_secondary.outcome == 'success' && steps.calculate_distribution.outputs.secondary_chunks_exist == 'true' }}
+    steps:
+      - name: Calculate Chunk Distribution for Accounts
+        id: calculate_distribution
+        shell: bash
+        run: |
+          ALL_CHUNKS_JSON='${{ needs.prepare_all_chunks_and_package.outputs.all_chunks_matrix_json }}'
+          PRIMARY_MAX_PARALLEL=${{ env.PRIMARY_ACCOUNT_MAX_PARALLEL }}
+          
+          echo "Full matrix (first 200 chars): $(echo "$ALL_CHUNKS_JSON" | head -c 200)"
+          echo "Primary account max parallel: $PRIMARY_MAX_PARALLEL"
+
+          # Chunks for Account 1 (Primary)
+          CHUNKS_FOR_PRIMARY=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson limit "$PRIMARY_MAX_PARALLEL" '.[0:$limit]')
+          echo "primary_matrix=$CHUNKS_FOR_PRIMARY" >> $GITHUB_OUTPUT
+          echo "Primary matrix (first 200 chars): $(echo "$CHUNKS_FOR_PRIMARY" | head -c 200)"
+
+          # Chunks for Account 2 (Secondary)
+          CHUNKS_FOR_SECONDARY=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson offset "$PRIMARY_MAX_PARALLEL" '.[$offset:]')
+          SECONDARY_COUNT=$(echo "$CHUNKS_FOR_SECONDARY" | jq 'length')
+
+          if [ "$SECONDARY_COUNT" -eq 0 ]; then
+            echo "No chunks remaining for secondary account."
+            echo "secondary_matrix=[]" >> $GITHUB_OUTPUT
+            echo "secondary_chunks_exist=false" >> $GITHUB_OUTPUT
+          else
+            echo "Secondary matrix (first 200 chars): $(echo "$CHUNKS_FOR_SECONDARY" | head -c 200)"
+            echo "secondary_matrix=$CHUNKS_FOR_SECONDARY" >> $GITHUB_OUTPUT
+            echo "secondary_chunks_exist=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Secondary Account Workflow
+        id: trigger_secondary
+        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
+        uses: benc-uk/workflow-dispatch@v1 # Popular choice for cross-repo workflow dispatch
+        with:
+          workflow: puredns_secondary_worker.yml # Name of the YML file in Account 2's repo
+          repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
+          token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }} # PAT from Account 2, with repo & workflow scope
+          # client-payload is data sent to the triggered workflow
+          client-payload: >-
+            {
+              "primary_github_server_url": "${{ github.server_url }}",
+              "primary_repo_owner": "${{ github.repository_owner }}",
+              "primary_repo_name": "${{ github.event.repository.name }}",
+              "primary_run_id": "${{ github.run_id }}",
+              "chunk_package_artifact_name": "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}",
+              "secondary_matrix_json": ${{ steps.calculate_distribution.outputs.secondary_matrix }}
+            }
+        # Note on client-payload: If secondary_matrix_json is huge, this can fail.
+        # A more robust method is to send indices or have Account 2 parse the full_matrix.json from the downloaded package.
+        # For now, this direct approach is simpler to start with.
+
+  resolve_primary_account_chunks:
+    name: Resolve Primary Account Chunks
+    needs: [prepare_all_chunks_and_package, distribute_and_trigger_secondary] # Depends on distribution logic
+    if: needs.prepare_all_chunks_and_package.outputs.total_chunks_count > 0 && needs.distribute_and_trigger_secondary.outputs.primary_matrix_json != '[]'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ env.PRIMARY_ACCOUNT_MAX_PARALLEL }}
+      matrix:
+        pair: ${{ fromJson(needs.distribute_and_trigger_secondary.outputs.primary_matrix_json) }}
+    steps:
+      - name: Checkout repository (for results structure, not chunks)
+        uses: actions/checkout@v3
+
+      - name: Download Full Chunks Package for Primary
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}
+          # No path needed, downloads to current directory
+
+      - name: Extract Chunks and Resolvers for Primary
+        shell: bash
+        run: |
+          PACKAGE_FILENAME="${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}.tar.gz"
+          echo "Extracting $PACKAGE_FILENAME..."
+          tar -xzvf "$PACKAGE_FILENAME"
+          if [ ! -d "chunks" ] || [ ! -f "resolvers.txt" ]; then
+             echo "ERROR: chunks directory or resolvers.txt not found after extraction!"
+             exit 1
+          fi
+          echo "Extraction complete. 'chunks/' and 'resolvers.txt' should be present."
+          ls -R chunks/ # Verify
+          ls resolvers.txt resolvers-trusted.txt
+
+      - name: Resolve chunk via PureDNS (Primary Account)
+        id: run_resolve_primary
+        shell: bash
+        run: |
+          DOMAIN=${{ matrix.pair.domain }}
+          CHUNK_FILE_PATH=${{ matrix.pair.chunk }} # This is the path like "chunks/domainA/chunk_001"
+
+          echo "PRIMARY ACCOUNT: Resolving chunk '$CHUNK_FILE_PATH' for domain '$DOMAIN'..."
+          if [ ! -f "$CHUNK_FILE_PATH" ]; then
+            echo "ERROR: Chunk file '$CHUNK_FILE_PATH' not found locally!"
+            exit 1
+          fi
+
+          OUT_DIR_PRIMARY="results_primary/$DOMAIN"
+          mkdir -p "$OUT_DIR_PRIMARY"
+          CHUNK_BASENAME=$(basename "$CHUNK_FILE_PATH")
+          OUT_FILE="$OUT_DIR_PRIMARY/resolved_${CHUNK_BASENAME}"
+          WILDCARD_FILE="$OUT_DIR_PRIMARY/wildcard_${CHUNK_BASENAME}"
+
+          puredns resolve "$CHUNK_FILE_PATH" \
+            -r resolvers.txt \
+            --resolvers-trusted resolvers-trusted.txt \
+            --write "$OUT_FILE" \
+            --write-wildcards "$WILDCARD_FILE" \
+            --wildcard-batch 100000 --wildcard-tests 250
+          
+          echo "CHUNK_BASENAME_PRIMARY=$CHUNK_BASENAME" >> $GITHUB_ENV
+
+      - name: Upload Primary Account Resolved Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: primary_resolved_${{ matrix.pair.domain }}_${{ env.CHUNK_BASENAME_PRIMARY }}
+          path: results_primary/${{ matrix.pair.domain }}/resolved_${{ env.CHUNK_BASENAME_PRIMARY }}
+          retention-days: 7 # Keep results longer
+
+  # Optional: Job to aggregate results IF NOT handled by Account 2
+  # aggregate_and_commit_all_results:
+  #   name: Aggregate All Results and Commit to Account 2 Repo
+  #   needs: [resolve_primary_account_chunks, distribute_and_trigger_secondary]
+  #   # This job should only run if secondary processing was triggered and primary also ran.
+  #   # Determining when Account 2 is "done" is complex without external signals or S3 polling.
+  #   # For simplicity, this example assumes you might run it manually or after a delay.
+  #   # Or Account 2 could trigger THIS job back once it's done.
+  #   if: always() && needs.distribute_and_trigger_secondary.outputs.secondary_processing_triggered == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Wait for secondary processing (heuristic)
+  #       run: |
+  #         echo "Waiting for a hypothetical period for Account 2 to finish..."
+  #         sleep 300 # 5 minutes - VERY ROUGH, NOT RELIABLE
+
+      # - name: Checkout Account 2 Repository
+      #   uses: actions/checkout@v3
+      #   with:
+      #     repository: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
+      #     token: ${{ secrets.PAT_FOR_ACCOUNT2_REPO_WRITE }} # PAT with write access to Account 2's repo
+      #     path: repo_account2
+
+      # - name: Download Primary Results Artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     # This would need to download ALL primary_resolved_* artifacts.
+      #     # download-artifact v4 supports pattern matching for names.
+      #     name: primary_resolved_* 
+      #     path: repo_account2/results_from_primary # Download to a specific subdir
+
+      # - name: Download Secondary Results Artifacts (from Account 2)
+      #   # This is the most complex part: how to get Account 2's artifacts here?
+      #   # Option 1: Account 2 uploads to S3, this job downloads from S3.
+      #   # Option 2: Account 2 triggers a workflow in THIS repo (Account 1) to signal completion and provide artifact details.
+      #   # Option 3: Use GitHub API with Account 2's PAT to find and download its artifacts (needs Account 2 PAT here).
+      #   run: echo "SIMULATING: Downloading Account 2's results..."
+
+      # - name: Combine and Commit Results
+      #   working-directory: ./repo_account2
+      #   run: |
+      #     # Logic to combine results from ./results_from_primary and (simulated) Account 2 results
+      #     # into a final 'results/' directory.
+      #     mkdir -p results
+      #     # mv ./results_from_primary/*/* ./results/
+      #     # mv (path_to_account2_results)/* ./results/
+            
+      #     git config --global user.name "GitHub Actions Aggregator"
+      #     git config --global user.email "actions-aggregator@github.com"
+      #     if [ -d "results" ] && [ "$(ls -A results)" ]; then
+      #       git add results/
+      #       if ! git diff --staged --quiet; then
+      #         git commit -m "Aggregate PureDNS results from distributed run ${{ github.run_id }}"
+      #         git push
+      #       else
+      #         echo "No new results to commit."
+      #       fi
+      #     else
+      #       echo "Results directory is empty. Nothing to commit."
+      #     fi
