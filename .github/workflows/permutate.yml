@@ -354,8 +354,7 @@ jobs:
             echo "DEBUG: Cloning target repo ${TARGET_REPO}..."
             # Clone to a temp directory to avoid interfering with current workspace
             TEMP_CLONE_DIR=$(mktemp -d)
-            gh repo clone "$TARGET_REPO" "$TEMP_CLONE_DIR" --depth 1 || { echo "ERROR: Failed to clone ${TARGET_REPO}. Ensure token has read access." >&2; exit 1; }
-            echo "DEBUG: Cloned to $TEMP_CLONE_DIR"
+            gh repo clone "$TARGET_REPO" "$TEMP_CLONE_DIR" -- --depth 1 || { echo "ERROR: Failed to clone ${TARGET_REPO}. Ensure token has read access." >&2; exit 1; }
 
             # Navigate to the cloned repo and inspect the workflow file
             cd "$TEMP_CLONE_DIR" || { echo "ERROR: Failed to change directory to $TEMP_CLONE_DIR." >&2; exit 1; }
