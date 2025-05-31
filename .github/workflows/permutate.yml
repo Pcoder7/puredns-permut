@@ -69,10 +69,6 @@ jobs:
         shell: bash
         run: |
 
-      - name: Build Full Matrix & Create Chunks
-        id: build_full_matrix
-        shell: bash
-        run: |
           # --- Start of Script ---
           JSON_MATRIX='[]' # Initialize as an empty JSON array string
           echo "INFO: Initializing JSON_MATRIX as: '$JSON_MATRIX'"
