@@ -347,14 +347,14 @@ jobs:
             --arg repo_name "${{ github.event.repository.name }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg artifact_name "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}" \
-            --argjson matrix_json "${SECONDARY_MATRIX_AS_STRING}" \
+            --arg matrix_as_a_string "${SECONDARY_MATRIX_AS_STRING}" \
             '{
               "primary_github_server_url": $server_url,
               "primary_repo_owner": $repo_owner,
               "primary_repo_name": $repo_name,
               "primary_run_id": $run_id,
               "chunk_package_artifact_name": $artifact_name,
-              "secondary_matrix_json": $matrix_json 
+              "secondary_matrix_json": $matrix_as_a_string 
             }')
           
           echo "Constructed JSON Payload: $JSON_PAYLOAD"
