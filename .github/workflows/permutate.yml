@@ -211,7 +211,7 @@ jobs:
         password: ${{ secrets.GHCR_TOKEN }}
     strategy:
       fail-fast: false
-      max-parallel: ${{ env.PRIMARY_ACCOUNT_MAX_PARALLEL }}
+      max-parallel: 20 
       matrix:
         pair: ${{ fromJson(needs.distribute_and_trigger_secondary.outputs.primary_matrix_json) }}
     steps:
