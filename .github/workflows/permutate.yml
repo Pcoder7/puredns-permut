@@ -330,7 +330,7 @@ jobs:
               "primary_repo_name": "${{ github.event.repository.name }}",
               "primary_run_id": "${{ github.run_id }}",
               "chunk_package_artifact_name": "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}",
-              "secondary_matrix_json": ${{ toJson(steps.calculate_distribution.outputs.secondary_matrix) }}
+              "secondary_matrix_json": "${{ toJson(steps.calculate_distribution.outputs.secondary_matrix) }}"
             } 
         # Note on client-payload: If secondary_matrix_json is huge, this can fail.
         # A more robust method is to send indices or have Account 2 parse the full_matrix.json from the downloaded package.
