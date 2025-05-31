@@ -180,7 +180,7 @@ jobs:
       - name: Trigger Secondary Account Workflow
         id: trigger_secondary
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
-        uses: benc-uk/workflow-dispatch@v1 # Popular choice for cross-repo workflow dispatch
+        uses: benc-uk/workflow-dispatch@v1  # Popular choice for cross-repo workflow dispatch
         with:
           workflow: resolve.yml # Name of the YML file in Account 2's repo
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
