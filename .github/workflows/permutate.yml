@@ -312,28 +312,56 @@ jobs:
             echo "secondary_chunks_exist=true" >> $GITHUB_OUTPUT
           fi
 
+      # Step to prepare the JSON payload string
+      - name: Prepare Trigger Payload
+        id: prepare_payload
+        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
+        shell: bash
+        run: |
+          # Ensure the secondary_matrix output from the previous step is treated as a string
+          # that already represents a JSON array. jq's --argjson will parse it.
+          SECONDARY_MATRIX_AS_STRING='${{ steps.calculate_distribution.outputs.secondary_matrix }}'
+
+          # Validate that SECONDARY_MATRIX_AS_STRING is actually valid JSON before --argjson
+          if ! echo "${SECONDARY_MATRIX_AS_STRING}" | jq -e . > /dev/null 2>&1; then
+            echo "::error title=Invalid Secondary Matrix::The secondary_matrix output ('${SECONDARY_MATRIX_AS_STRING}') is not valid JSON. Defaulting to empty array."
+            SECONDARY_MATRIX_AS_STRING="[]" # Fallback to an empty JSON array string
+          fi
+
+          # Construct the entire payload as a valid JSON string using jq
+          # --argjson tells jq to parse the value of matrix_json as JSON, not treat it as a literal string
+          JSON_PAYLOAD=$(jq -cn \
+            --arg server_url "${{ github.server_url }}" \
+            --arg repo_owner "${{ github.repository_owner }}" \
+            --arg repo_name "${{ github.event.repository.name }}" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg artifact_name "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}" \
+            --argjson matrix_json "${SECONDARY_MATRIX_AS_STRING}" \
+            '{
+              "primary_github_server_url": $server_url,
+              "primary_repo_owner": $repo_owner,
+              "primary_repo_name": $repo_name,
+              "primary_run_id": $run_id,
+              "chunk_package_artifact_name": $artifact_name,
+              "secondary_matrix_json": $matrix_json 
+            }')
+          
+          echo "Constructed JSON Payload: $JSON_PAYLOAD"
+          # Set the constructed JSON string as an output of this step
+          echo "json_string=$JSON_PAYLOAD" >> "$GITHUB_OUTPUT"
+
+      # Step to trigger the workflow using the prepared JSON payload string
       - name: Trigger Secondary Account Workflow
-        id: trigger_secondary
+        id: trigger_secondary 
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: resolve.yml # Name of the YML file in Account 2's repo
+          workflow: resolve.yml 
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
-          token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }} # Ensure this secret is correctly set and PAT has 'workflow' scope
-          # Use 'inputs' and format the payload as a JSON string
-          # Data to send to the triggered workflow in Account 2
-          # This data will be available as github.event.inputs in Account 2's workflow
-          inputs: ${{ 
-            toJson({
-              "primary_github_server_url": github.server_url,
-              "primary_repo_owner": github.repository_owner,
-              "primary_repo_name": github.event.repository.name,
-              "primary_run_id": github.run_id,
-              "chunk_package_artifact_name": needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name,
-              "secondary_matrix_json": fromJson(steps.calculate_distribution.outputs.secondary_matrix)
-            })
-          }}
-        # Note on client-payload: If secondary_matrix_json is huge, this can fail.
+          token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }}
+          # Use the output from the 'Prepare Trigger Payload' step
+          inputs: ${{ steps.prepare_payload.outputs.json_string }} 
+        # Note on inputs If secondary_matrix_json is huge, this can fail.
         # A more robust method is to send indices or have Account 2 parse the full_matrix.json from the downloaded package.
         # For now, this direct approach is simpler to start with.
 
