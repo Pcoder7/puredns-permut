@@ -11,8 +11,8 @@ env:
   LINES_PER_CHUNK: 100000
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
-  ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'YourAccount2Username' }} # Fallback for testing
-  ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'YourAccount2WorkerRepoName' }} # Fallback for testing
+  ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
+  ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'puredns-resolve' }} # Fallback for testing
 
 jobs:
   prepare_all_chunks_and_package:
