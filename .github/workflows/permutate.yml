@@ -360,7 +360,8 @@ jobs:
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
           token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }}
           # Use the output from the 'Prepare Trigger Payload' step
-          inputs: ${{ steps.prepare_payload.outputs.json_string }} 
+          inputs: ${{ steps.prepare_payload.outputs.json_string }}
+          ref: main # Or your default branch name in Account 2
         # Note on inputs If secondary_matrix_json is huge, this can fail.
         # A more robust method is to send indices or have Account 2 parse the full_matrix.json from the downloaded package.
         # For now, this direct approach is simpler to start with.
