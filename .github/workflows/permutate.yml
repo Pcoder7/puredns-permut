@@ -230,31 +230,49 @@ jobs:
           echo "full_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
           echo "total_chunks=$TOTAL_CHUNKS" >> $GITHUB_OUTPUT                 
 
-      - name: Package All Chunks and Resolvers
-        id: package_chunks
+      - name: Package All Chunks and Resolvers      
+        id: package_chunks # This ID is referenced by outputs and later steps
         if: steps.build_full_matrix.outputs.total_chunks > 0
         shell: bash
         run: |
-          ARTIFACT_NAME="all-chunks-package-${{ github.run_id }}"
-          echo "INFO: Preparing package '$ARTIFACT_NAME.tar.gz'..."
-          # Ensure resolvers.txt and resolvers-trusted.txt are present or created if needed
+          # Define the base name for the artifact (without .tar.gz)
+          BASE_ARTIFACT_NAME="all-chunks-package-${{ github.run_id }}"
+          # Define the full tar filename
+          PACKAGE_TAR_FILENAME="${BASE_ARTIFACT_NAME}.tar.gz"
+
+          echo "INFO: Preparing package '$PACKAGE_TAR_FILENAME'..."
+          # Ensure resolver files and full_matrix.json exist, create fallbacks if not
           if [ ! -f resolvers.txt ]; then echo "WARNING: resolvers.txt not found, creating default." >&2; echo '1.1.1.1' > resolvers.txt; fi
           if [ ! -f resolvers-trusted.txt ]; then echo "WARNING: resolvers-trusted.txt not found, creating empty." >&2; touch resolvers-trusted.txt; fi
+          if [ ! -f full_matrix.json ]; then echo "WARNING: full_matrix.json not found, creating empty array JSON file." >&2; echo "[]" > full_matrix.json; fi
           
-          tar -czvf "$ARTIFACT_NAME.tar.gz" chunks resolvers.txt resolvers-trusted.txt full_matrix.json
-          # We also add full_matrix.json to the tarball so Account 2 can reconstruct its portion if needed,
-          # or Account 1 could send indices instead of the full secondary_matrix_json.
-          # For now, we'll still send secondary_matrix_json directly.
-          echo "$ARTIFACT_NAME.tar.gz created."
-          echo "package_filename=$ARTIFACT_NAME.tar.gz" >> $GITHUB_OUTPUT
+          # Create the tarball
+          echo "INFO: Creating tarball: $PACKAGE_TAR_FILENAME"
+          tar -czvf "$PACKAGE_TAR_FILENAME" chunks resolvers.txt resolvers-trusted.txt full_matrix.json
+          
+          if [ $? -eq 0 ]; then
+            echo "INFO: '$PACKAGE_TAR_FILENAME' created successfully."
+          else
+            echo "ERROR: Failed to create tarball '$PACKAGE_TAR_FILENAME'."
+            # Exit or handle error appropriately if tar fails
+            exit 1 
+          fi
+          
+          # Output the full .tar.gz filename for the 'path' in upload-artifact
+          echo "package_tar_filename=$PACKAGE_TAR_FILENAME" >> $GITHUB_OUTPUT
+          # Output the base artifact name (without .tar.gz) for the 'name' in upload-artifact and for job output
+          echo "base_artifact_name=$BASE_ARTIFACT_NAME" >> $GITHUB_OUTPUT
 
+      # --- MODIFIED STEP ---
       - name: Upload Full Chunks Package
-        if: steps.build_full_matrix.outputs.total_chunks > 0
+        if: steps.build_full_matrix.outputs.total_chunks > 0 && steps.package_chunks.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }} # Use dynamic name
-          path: ${{ steps.package_chunks.outputs.package_filename }}
-          retention-days: 2 # Keep it for a couple of days for Account 2 to pick up
+          # Use the base artifact name output from the 'package_chunks' step
+          name: ${{ steps.package_chunks.outputs.base_artifact_name }}
+          # Use the full tar filename output from the 'package_chunks' step
+          path: ${{ steps.package_chunks.outputs.package_tar_filename }}
+          retention-days: 2
 
   distribute_and_trigger_secondary:
     name: Distribute Work & Trigger Secondary
