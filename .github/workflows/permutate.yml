@@ -311,7 +311,83 @@ jobs:
             echo "secondary_matrix=$CHUNKS_FOR_SECONDARY" >> $GITHUB_OUTPUT
             echo "secondary_chunks_exist=true" >> $GITHUB_OUTPUT
           fi
+      
+      - name: DEBUG - Verify Target Workflow Inputs in Account 2 Repo
+        id: debug_verify_target_workflow
+        # This step requires secrets.PAT_FOR_ACCOUNT2_REPO_WRITE or a PAT with read access to Account 2's repo
+        # If you only have PAT_FOR_SECONDARY_ACCOUNT_REPO (with workflow scope), you might need
+        # to generate a separate PAT from Account 2 with 'contents: read' scope and use that secret here.
+        # Or, if Account 2's repo is public, no token is needed.
+        env:
+          ACCOUNT2_REPO_OWNER_DEBUG: ${{ env.ACCOUNT2_REPO_OWNER }}
+          ACCOUNT2_REPO_NAME_DEBUG: ${{ env.ACCOUNT2_REPO_NAME }}
+          # Use a specific PAT for reading Account 2's repo if needed
+          # DEBUG_ACCOUNT2_READ_TOKEN: ${{ secrets.PAT_FROM_ACCOUNT2_FOR_READING_REPO }} # Define this secret if needed
+        run: |
+          echo "DEBUG: Attempting to verify target workflow inputs in Account 2 repository..."
+          TARGET_REPO="${ACCOUNT2_REPO_OWNER_DEBUG}/${ACCOUNT2_REPO_NAME_DEBUG}"
+          TARGET_WORKFLOW_FILE=".github/workflows/resolve.yml" # Adjust filename if different
 
+          # Use gh CLI to clone the target repo (requires gh CLI in runner)
+          # Or use actions/checkout@v3 with a PAT
+
+          # Option A: Use actions/checkout@v3 (requires a PAT with 'contents: read' for Account 2 repo)
+          # This is generally cleaner. Requires secrets.PAT_FROM_ACCOUNT2_FOR_READING_REPO or similar
+          echo "DEBUG: Checking out ${TARGET_REPO}..."
+          # Need a separate checkout step for this if you use actions/checkout outside this run block
+          # This run block alone cannot use 'uses: actions/checkout'
+
+          # Let's use gh CLI which can be used within a run script
+          if ! command -v gh &> /dev/null; then
+            echo "DEBUG: gh CLI not found. Attempting installation..."
+            # Basic install - may need adjustment for your container
+            apt-get update && apt-get install -y gh || echo "DEBUG: gh CLI installation failed."
+          fi
+
+          if command -v gh &> /dev/null; then
+            # Login with the token that has read access to Account 2's repo
+            # If ACCOUNT2_REPO_OWNER is an Org, PAT needs repo:read org:read scope
+            # If ACCOUNT2_REPO_OWNER is a User, PAT needs repo scope
+            # Use the PAT_FOR_SECONDARY_ACCOUNT_REPO if it has repo scope, or a dedicated read PAT
+            echo "${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }}" | gh auth login --with-token || echo "DEBUG: gh auth login failed."
+
+            echo "DEBUG: Cloning target repo ${TARGET_REPO}..."
+            # Clone to a temp directory to avoid interfering with current workspace
+            TEMP_CLONE_DIR=$(mktemp -d)
+            gh repo clone "$TARGET_REPO" "$TEMP_CLONE_DIR" --depth 1 || { echo "ERROR: Failed to clone ${TARGET_REPO}. Ensure token has read access." >&2; exit 1; }
+            echo "DEBUG: Cloned to $TEMP_CLONE_DIR"
+
+            # Navigate to the cloned repo and inspect the workflow file
+            cd "$TEMP_CLONE_DIR" || { echo "ERROR: Failed to change directory to $TEMP_CLONE_DIR." >&2; exit 1; }
+
+            if [ -f "$TARGET_WORKFLOW_FILE" ]; then
+              echo "DEBUG: Found target workflow file: ${TARGET_WORKFLOW_FILE}"
+              echo "DEBUG: --- Content of target workflow file (.github/workflows/resolve.yml): ---"
+              cat "$TARGET_WORKFLOW_FILE"
+              echo "DEBUG: --- End of target workflow file content ---"
+
+              # Optional: Use awk/sed/grep to specifically extract and print the inputs block
+              echo "DEBUG: Attempting to extract on.workflow_dispatch.inputs block:"
+              awk '/^on:/,/^jobs:/' "$TARGET_WORKFLOW_FILE" | \
+              awk '/workflow_dispatch:/,/^$/' | \
+              grep -A 10 "inputs:" # Adjust grep line count if needed
+              echo "DEBUG: --- End of extracted inputs block ---"
+
+            else
+              echo "ERROR: Target workflow file '${TARGET_WORKFLOW_FILE}' not found in the cloned repository."
+              echo "DEBUG: Listing files in .github/workflows/:"
+              ls -la .github/workflows/ || echo "DEBUG: Could not list directory."
+              exit 1
+            fi
+
+            # Clean up temp directory
+            rm -rf "$TEMP_CLONE_DIR"
+            echo "DEBUG: Cleaned up temp directory."
+
+          else
+            echo "WARNING: gh CLI not available. Cannot perform detailed target workflow verification."
+          fi
+        # if: always() # Run this step even if previous steps failed
       # Step to prepare the JSON payload string
       - name: Prepare Trigger Payload
         id: prepare_payload
