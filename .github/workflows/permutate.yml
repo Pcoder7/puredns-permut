@@ -8,7 +8,7 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 100000
+  LINES_PER_CHUNK: 5000
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
   ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
@@ -184,7 +184,7 @@ jobs:
         with:
           workflow: puredns_secondary_worker.yml # Name of the YML file in Account 2's repo
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
-          token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }} # PAT from Account 2, with repo & workflow scope
+          token: ${{ secrets.PAT_FOR_SECONDARY }} # PAT from Account 2, with repo & workflow scope
           # client-payload is data sent to the triggered workflow
           client-payload: >-
             {
