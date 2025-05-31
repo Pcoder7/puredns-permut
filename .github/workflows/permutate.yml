@@ -317,7 +317,7 @@ jobs:
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: secondary_worker_for_puredns.yml # Name of the YML file in Account 2's repo
+          workflow: resolve.yml # Name of the YML file in Account 2's repo
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
           token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }} # Ensure this secret is correctly set and PAT has 'workflow' scope
           # Use 'inputs' and format the payload as a JSON string
