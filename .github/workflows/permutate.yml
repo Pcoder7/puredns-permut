@@ -315,13 +315,13 @@ jobs:
       - name: Trigger Secondary Account Workflow
         id: trigger_secondary
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
-        uses: benc-uk/workflow-dispatch@v1  # Popular choice for cross-repo workflow dispatch
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: resolve.yml # Name of the YML file in Account 2's repo
+          workflow: secondary_worker_for_puredns.yml # Name of the YML file in Account 2's repo
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
-          token: ${{ secrets.PAT_FOR_SECONDARY }} # PAT from Account 2, with repo & workflow scope
-          # client-payload is data sent to the triggered workflow
-          client-payload: >-
+          token: ${{ secrets.PAT_FOR_SECONDARY }} # Ensure this secret is correctly set and PAT has 'workflow' scope
+          # Use 'inputs' and format the payload as a JSON string
+          inputs: | # Using a literal block scalar for easier multi-line JSON
             {
               "primary_github_server_url": "${{ github.server_url }}",
               "primary_repo_owner": "${{ github.repository_owner }}",
