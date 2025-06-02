@@ -495,7 +495,7 @@ jobs:
       - name: Compute SAFE_CHUNK (no slashes)
         run: |
           SAFE_CHUNK="${{ matrix.pair.chunk }}"
-          SAFE_CHUNK="${SAFE_CHUNK//\//_}"
+          SAFE_CHUNK="$(echo "$SAFE_CHUNK" | tr '/' '_')"
           echo "SAFE_CHUNK=$SAFE_CHUNK" >> $GITHUB_ENV         
       
       - name: Upload Primary Account httpx+dsieve Results
