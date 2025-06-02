@@ -491,10 +491,16 @@ jobs:
           echo "-> Split complete for domain '$DOMAIN'."
           # Always create a results/ directory (so upload-artifact never complains about “no files”)
           mkdir -p results
-         
+      
+      - name: Compute SAFE_CHUNK (no slashes)
+        run: |
+          SAFE_CHUNK="${{ matrix.pair.chunk }}"
+          SAFE_CHUNK="${SAFE_CHUNK//\//_}"
+          echo "SAFE_CHUNK=$SAFE_CHUNK" >> $GITHUB_ENV         
+      
       - name: Upload Primary Account httpx+dsieve Results
         uses: actions/upload-artifact@v4
         with:
-          name: primary_httpx_dsieve_${{ matrix.pair.domain }}_${{ replace(matrix.pair.chunk, '/', '_') }}
+          name: primary_httpx_dsieve_${{ matrix.pair.domain }}_${{ env.SAFE_CHUNK }}
           path: results/
           retention-days: 1
