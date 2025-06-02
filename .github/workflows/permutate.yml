@@ -8,7 +8,7 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 5000
+  LINES_PER_CHUNK: 50
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
   ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
@@ -489,7 +489,9 @@ jobs:
           done < parent_domains.txt
 
           echo "-> Split complete for domain '$DOMAIN'."
-
+          # Always create a results/ directory (so upload-artifact never complains about “no files”)
+          mkdir -p results
+         
       - name: Upload Primary Account httpx+dsieve Results
         uses: actions/upload-artifact@v4
         with:
