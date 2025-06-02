@@ -377,6 +377,11 @@ jobs:
     needs: [prepare_all_chunks_and_package, distribute_and_trigger_secondary] # Depends on distribution logic
     if: needs.prepare_all_chunks_and_package.outputs.total_chunks_count > 0 && needs.distribute_and_trigger_secondary.outputs.primary_matrix_json != '[]'
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}    
     strategy:
       fail-fast: false
       max-parallel: 20 
@@ -431,7 +436,7 @@ jobs:
           # Step A: pre-dsieve on the raw subdomain chunk (no httpx yet)
           # ───────────────────────────────────────────────────────────
           echo "-> Generating parent_domains.txt from raw subdomains..."
-          "$GOBIN/dsieve" -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
+          dsieve" -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
 
           echo "  Parents in this chunk: $(wc -l < parent_domains.txt)"
           head -n 5 parent_domains.txt || true
@@ -441,9 +446,9 @@ jobs:
           # ───────────────────────────────────────────────────────────
           HTTPX_OUT="httpx_output.txt"
           echo "-> Running httpx (100 threads) against '$CHUNK_FILE_PATH'..."
-          "$GOBIN/httpx" \
+          httpx \
             -l "$CHUNK_FILE_PATH" \
-            -threads 100 \
+            -threads 200 \
             -silent \
             -no-color \
             -o "$HTTPX_OUT"
