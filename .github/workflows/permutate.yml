@@ -471,7 +471,7 @@ jobs:
           # ───────────────────────────────────────────────────────────
           # Step D: For each parent domain, filter the matching URLs
           # ───────────────────────────────────────────────────────────
-          OUTPUT_ROOT="../results"
+          OUTPUT_ROOT="results"
           mkdir -p "$OUTPUT_ROOT"
 
           while read -r parent; do
