@@ -413,12 +413,15 @@ jobs:
       - name: Set up Go & install httpx + dsieve
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.23'
       - name: Install httpx and dsieve
         run: |
-          GO111MODULE=on go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-          GO111MODULE=on go install github.com/trickest/dsieve@latest
-          echo "GOBIN=$(go env GOBIN)" >> $GITHUB_ENV
+          if command -v dsieve &> /dev/null; then
+            echo "dsieve is already installed"
+          else
+            echo "Installing dsieve..."
+            go install github.com/trickest/dsieve@latest
+          fi
 
       - name: Run httpx + pre-dsieve on subdomains + final filtering
         shell: bash
@@ -436,7 +439,7 @@ jobs:
           # Step A: pre-dsieve on the raw subdomain chunk (no httpx yet)
           # ───────────────────────────────────────────────────────────
           echo "-> Generating parent_domains.txt from raw subdomains..."
-          dsieve" -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
+          dsieve -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
 
           echo "  Parents in this chunk: $(wc -l < parent_domains.txt)"
           head -n 5 parent_domains.txt || true
