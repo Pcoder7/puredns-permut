@@ -561,7 +561,7 @@ jobs:
         with:
           pattern: primary_purednss_dsieve_*
           path: temp_results
-     
+
       - name: Organize and Push to store-recon
         shell: bash
         env:
@@ -571,50 +571,58 @@ jobs:
         run: |
           echo "Organizing primary results..."
           git config --global --add safe.directory "$(pwd)"
-    
-          # Merge downloaded primary outputs into ./results/<parent>/
+
+          # First, collect all chunk outputs into the runner’s results/ folder
           mkdir -p results
           find temp_results -type f -name "puredns_result.txt" | while read -r filepath; do
             parent="$(basename "$(dirname "$filepath")")"
             mkdir -p "results/$parent"
             cat "$filepath" | anew -q "results/$parent/puredns_result.txt"
           done || true
-    
+
+          # If the runner’s results/ is empty, nothing to push
           if [ ! -d "results" ] || [ -z "$(ls -A results)" ]; then
             echo "No results to push."
             exit 0
           fi
-    
+
+          # Configure Git identity for commits
           git config --global user.name "Account2 PureDNS Bot"
           git config --global user.email "actions-bot@users.noreply.github.com"
-    
+
           # Clone the private store-recon repo from Account 2
           TMP_DIR="$(mktemp -d)"
           echo "Cloning store-recon into $TMP_DIR"
           git clone "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" "$TMP_DIR"
-          cd "$TMP_DIR" 
-    
+          cd "$TMP_DIR" || exit 1
+
+          # Ensure a top-level results/ exists in the cloned repo
           mkdir -p results
-          WORKSPACE_RESULTS="${GITHUB_WORKSPACE}/results"
-          find "$WORKSPACE_RESULTS" -type f -name "puredns_result.txt" | while read -r filepath; do
-            rel="${filepath#"$WORKSPACE_RESULTS/"}"
-            mkdir -p "results/$(dirname "$rel")"
-            cat "$filepath" | anew -q "results/$rel"
-            echo "DEBUG: 'results/$parent/puredns_result.txt' now has $(wc -l <  "results/$rel") lines." 
-          done
-    
-          # Retry up to 10 times to handle concurrent updates
+
+          # Retry up to 10 times to handle races on main
           for i in {1..10}; do
             git fetch origin main
             git checkout main
             git pull --rebase origin main
-    
+
+            # Wipe and re-create the clone’s results/ to start fresh each attempt
+            rm -rf results
+            mkdir -p results
+
+            WORKSPACE_RESULTS="${GITHUB_WORKSPACE}/results"
+            find "$WORKSPACE_RESULTS" -type f -name "puredns_result.txt" | while read -r filepath; do
+              rel="${filepath#"$WORKSPACE_RESULTS/"}"
+              mkdir -p "results/$(dirname "$rel")"
+              cat "$filepath" | anew -q "results/$rel"
+              echo "DEBUG: 'results/$rel' now has $(wc -l < "results/$rel") lines."
+            done
+
             git add results/
             if git diff --cached --quiet; then
               echo "No changes to commit in store-recon."
               exit 0
             fi
-    
+
             git commit -m "Primary puredns+dsieve results (Run: ${{ github.event.inputs.primary_run_id || github.run_id }})"
             if git push origin main; then
               echo "Pushed to store-recon successfully on attempt #$i."
@@ -624,7 +632,7 @@ jobs:
               git reset --hard origin/main
             fi
           done
-    
+
           echo "ERROR: Could not push results to store-recon after 10 attempts."
-          exit 1
-          
+          exit 1      
+      
