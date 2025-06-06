@@ -548,7 +548,7 @@ jobs:
     container:
       image: ghcr.io/pcoder7/spider-puredns-actions:latest
       credentials:
-        username: ${{ secrets.ACCOUNT2_USERNAME }}
+        username: ${{ secrets.GHCR_USER }}
         password: ${{ secrets.GHCR_TOKEN }}        
     steps:
       - name: Checkout repository (Account 2's repo)
@@ -566,8 +566,8 @@ jobs:
         shell: bash
         env:
           STORE_RECON_PAT: ${{ secrets.STORE_RECON_PAT }}
-          STORE: ${{ secrets.STORE }}.git
-          ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_USERNAME }}
+          STORE: ${{ secrets.STORE }}
+          ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
         run: |
           echo "Organizing primary results..."
           git config --global --add safe.directory "$(pwd)"
@@ -591,7 +591,7 @@ jobs:
           # Clone the private store-recon repo from Account 2
           TMP_DIR="$(mktemp -d)"
           echo "Cloning store-recon into $TMP_DIR"
-          git clone "https://x-access-token:${STORE_RECON_PAT}@github.com/${Account2_Username}/${STORE}" "$TMP_DIR"
+          git clone "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" "$TMP_DIR"
           cd "$TMP_DIR" 
     
           mkdir -p results
