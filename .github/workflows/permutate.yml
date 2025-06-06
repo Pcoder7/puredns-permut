@@ -373,7 +373,7 @@ jobs:
           ref: main # Or your default branch name in Account 2
 
   resolve_primary_account_chunks:
-    name: Resolve Primary Account Chunks (httpx + dsieve)
+    name: Resolve Primary Account Chunks (puredns + dsieve)
     needs: [prepare_all_chunks_and_package, distribute_and_trigger_secondary] # Depends on distribution logic
     if: needs.prepare_all_chunks_and_package.outputs.total_chunks_count > 0 && needs.distribute_and_trigger_secondary.outputs.primary_matrix_json != '[]'
     runs-on: ubuntu-latest
@@ -410,11 +410,11 @@ jobs:
           echo "Extraction complete. 'chunks/' should be present."
           ls -R chunks/
 
-      - name: Set up Go & install httpx + dsieve
+      - name: Set up Go & install dsieve
         uses: actions/setup-go@v4
         with:
           go-version: '1.23'
-      - name: Install httpx and dsieve
+      - name: Install dsieve
         run: |
           if command -v dsieve &> /dev/null; then
             echo "dsieve is already installed"
@@ -423,7 +423,7 @@ jobs:
             go install github.com/trickest/dsieve@latest
           fi
 
-      - name: Run httpx + pre-dsieve on subdomains + final filtering
+      - name: Run puredns + pre-dsieve on subdomains + final filtering
         shell: bash
         run: |
           DOMAIN=${{ matrix.pair.domain }}
@@ -436,7 +436,7 @@ jobs:
           fi
 
           # ───────────────────────────────────────────────────────────
-          # Step A: pre-dsieve on the raw subdomain chunk (no httpx yet)
+          # Step A: pre-dsieve on the raw subdomain chunk (no puredns yet)
           # ───────────────────────────────────────────────────────────
           echo "-> Generating parent_domains.txt from raw subdomains..."
           dsieve -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
@@ -445,18 +445,19 @@ jobs:
           head -n 5 parent_domains.txt || true
 
           # ───────────────────────────────────────────────────────────
-          # Step B: Probe all subdomains in this chunk with httpx
+          # Step B: Probe all subdomains in this chunk with puredns
           # ───────────────────────────────────────────────────────────
-          HTTPX_OUT="httpx_output.txt"
-          echo "-> Running httpx (100 threads) against '$CHUNK_FILE_PATH'..."
-          httpx \
-            -l "$CHUNK_FILE_PATH" \
-            -threads 200 \
-            -silent \
-            -no-color \
-            -o "$HTTPX_OUT"
+          PUREDNS_OUT="puredns_output.txt"
+          echo "-> Running puredns (100 threads) against '$CHUNK_FILE_PATH'..."
+          puredns resolve "$CHUNK_FILE_PATH" \
+            -r resolvers.txt \
+            --resolvers-trusted resolvers-trusted.txt \
+            --write "$PUREDNS_OUT" \
+            --write-wildcards "$WILDCARD_FILE" \
+            --wildcard-batch 100000 --wildcard-tests 250
+            
 
-          if [ ! -s "$HTTPX_OUT" ]; then
+          if [ ! -s "$PUREDNS_OUT" ]; then
             echo "No live URLs found in this chunk. Exiting early."
             exit 0
           fi
@@ -464,7 +465,7 @@ jobs:
           # ───────────────────────────────────────────────────────────
           # Step C: Extract host:port from each live URL (for debugging only)
           # ───────────────────────────────────────────────────────────
-          cut -d'/' -f3 "$HTTPX_OUT" > hosts_with_port.txt
+          cut -d'/' -f3 "$PUREDNS_OUT" > hosts_with_port.txt
           echo "  Sample hosts_with_port.txt:"
           head -n 5 hosts_with_port.txt || true
 
@@ -484,8 +485,8 @@ jobs:
                   print $0
                 }
               }
-            ' "$HTTPX_OUT" \
-              > "$OUTPUT_ROOT/$parent/httpx_result.txt"
+            ' "$PUREDNS_OUT" \
+              > "$OUTPUT_ROOT/$parent/puredns_result.txt"
           done < parent_domains.txt
 
           echo "-> Split complete for domain '$DOMAIN'."
@@ -498,9 +499,9 @@ jobs:
           SAFE_CHUNK="$(echo "$SAFE_CHUNK" | tr '/' '_')"
           echo "SAFE_CHUNK=$SAFE_CHUNK" >> $GITHUB_ENV         
       
-      - name: Upload Primary Account httpx+dsieve Results
+      - name: Upload Primary Account puredns+dsieve Results
         uses: actions/upload-artifact@v4
         with:
-          name: primary_httpx_dsieve_${{ matrix.pair.domain }}_${{ env.SAFE_CHUNK }}
+          name: primary_purednss_dsieve_${{ matrix.pair.domain }}_${{ env.SAFE_CHUNK }}
           path: results/
           retention-days: 1
