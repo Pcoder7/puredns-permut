@@ -539,3 +539,27 @@ jobs:
           name: primary_purednss_dsieve_${{ matrix.pair.domain }}_${{ env.SAFE_CHUNK }}
           path: results/
           retention-days: 1
+  
+  commit_all_primary_results:
+    name: Commit All Primary Results
+    needs: resolve_primary_account_chunks
+    if: always()
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: pcoder7
+        password: ${{ secrets.GHCR_TOKEN }}        
+    steps:
+      - name: Checkout repository (Account 2's repo)
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all 'primary_purednss_dsieve_*' artifacts from this workflow run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: primary_purednss_dsieve_*
+          path: temp_results
+
+          
