@@ -600,6 +600,7 @@ jobs:
             rel="${filepath#"$WORKSPACE_RESULTS/"}"
             mkdir -p "results/$(dirname "$rel")"
             cat "$filepath" | anew -q "results/$rel"
+            echo "DEBUG: 'results/$parent/puredns_result.txt' now has $(wc -l <  "results/$rel") lines." 
           done
     
           # Retry up to 10 times to handle concurrent updates
