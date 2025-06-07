@@ -48,8 +48,8 @@ jobs:
           chrunk -p 20 \
             -i "$BASE_LIST" \
             -c 20 \
-            -prefix dnsgen1097 \
-            -cmd 'dnsgen -w '"$WORD_LIST"' "{}" | anew -q "{}.txt"'
+            -prefix gotator1097 \
+            -cmd 'gotator -adv -prefixes -depth 1 -perm '"$WORD_LIST"' -sub "{}" -md -mindup | anew -q "{}.txt"'
 
           cat "$TMPDIR"/chrunk-data/dnsgen1097-*.txt > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
