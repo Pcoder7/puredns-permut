@@ -44,14 +44,21 @@ jobs:
           WORD_LIST="navy-mil-words.txt"
           [ -f "$BASE_LIST" ] && [ -f "$WORD_LIST" ] || { echo "Missing inputs"; exit 1; }
 
+          if command -v gotator &> /dev/null; then
+            echo "gotator is already installed"
+          else
+            echo "Installing gotator..."
+            go install github.com/Josue87/gotator@latest
+          fi
+
           echo "Using TMPDIR=$TMPDIR for chunk outputs"
           chrunk -p 20 \
             -i "$BASE_LIST" \
             -c 20 \
             -prefix gotator1097 \
-            -cmd 'gotator -adv -prefixes -depth 1 -perm '"$WORD_LIST"' -sub "{}" -md -mindup -silent | anew -q "{}.txt"'
+            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -silent | anew -q "{}.txt"'
 
-          cat "$TMPDIR"/chrunk-data/gotator1097-*.txt > subdomains.txt
+          cat "$TMPDIR"/chrunk-data/gotator1097-*.txt | anew -q subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
       
       - name: DEBUG - Verify Tools and Initial File System State
