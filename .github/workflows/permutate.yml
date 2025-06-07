@@ -51,7 +51,7 @@ jobs:
             -prefix dnsgen1097 \
             -cmd 'dnsgen -w '"$WORD_LIST"' "{}" | anew -q "{}.txt"'
 
-          cat "$TMPDIR"/dnsgen1097-*.txt > subdomains.txt
+          cat "$TMPDIR"/chrunk-data/dnsgen1097-*.txt > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
       
       - name: DEBUG - Verify Tools and Initial File System State
