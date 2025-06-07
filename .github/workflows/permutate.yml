@@ -8,7 +8,7 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 5500
+  LINES_PER_CHUNK: 175000
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
   ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
@@ -33,7 +33,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      
+      - name: Generate subdomains.txt via chrunk + dnsgen
+        shell: bash
+        run: |
+          # Point all Go/chrunk temp files into the Actions temp area:
+          export TMPDIR="$RUNNER_TEMP"
 
+          BASE_LIST="navy-mil.txt"
+          WORD_LIST="navy-mil-words.txt"
+          [ -f "$BASE_LIST" ] && [ -f "$WORD_LIST" ] || { echo "Missing inputs"; exit 1; }
+
+          echo "Using TMPDIR=$TMPDIR for chunk outputs"
+          chrunk -p 20 \
+            -i "$BASE_LIST" \
+            -c 20 \
+            -prefix dnsgen1097 \
+            -cmd 'dnsgen -w '"$WORD_LIST"' "{}" | anew -q "{}.txt"'
+
+          cat /tmp/chrunk-data/dnsgen1097-*.txt > subdomains.txt
+          echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
+      
       - name: DEBUG - Verify Tools and Initial File System State
         shell: bash
         run: |
