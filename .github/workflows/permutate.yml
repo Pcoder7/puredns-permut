@@ -51,7 +51,7 @@ jobs:
             -prefix gotator1097 \
             -cmd 'gotator -adv -prefixes -depth 1 -perm '"$WORD_LIST"' -sub "{}" -md -mindup | anew -q "{}.txt"'
 
-          cat "$TMPDIR"/chrunk-data/dnsgen1097-*.txt > subdomains.txt
+          cat "$TMPDIR"/chrunk-data/gotator1097-*.txt > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
       
       - name: DEBUG - Verify Tools and Initial File System State
