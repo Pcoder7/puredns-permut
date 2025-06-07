@@ -56,12 +56,13 @@ jobs:
             -i "$BASE_LIST" \
             -c 20 \
             -prefix gotator007 \
-            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -silent | anew -q "{}-lola.txt"'
+            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -mindup -silent | anew -q "{}-lola.txt"'
 
           wc "$TMPDIR"/chrunk-data/gotator007-*.txt
-          cat "$TMPDIR"/chrunk-data/gotator007-*-lola.txt | anew -q subdomains.txt
+          cat "$TMPDIR"/chrunk-data/gotator007-*.txt | uniq > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
-      
+          wc subdomains.txt
+          
       - name: DEBUG - Verify Tools and Initial File System State
         shell: bash
         run: |
