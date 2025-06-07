@@ -55,10 +55,10 @@ jobs:
           chrunk -p 20 \
             -i "$BASE_LIST" \
             -c 20 \
-            -prefix gotator1097 \
-            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -mindup -silent | anew -q "{}-lola.txt"'
+            -prefix gotator007 \
+            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -silent | anew -q "{}-lola.txt"'
 
-          cat "$TMPDIR"/chrunk-data/gotator1097-*.txt | anew -q subdomains.txt
+          cat "$TMPDIR"/chrunk-data/gotator1097-*-lola.txt | anew -q subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
       
       - name: DEBUG - Verify Tools and Initial File System State
