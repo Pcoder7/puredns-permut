@@ -8,7 +8,7 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 750000
+  LINES_PER_CHUNK: 745000
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
   ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
@@ -491,6 +491,7 @@ jobs:
           PUREDNS_OUT="puredns_output.txt"
           echo "-> Running puredns against '$CHUNK_FILE_PATH'..."
           puredns resolve "$CHUNK_FILE_PATH" \
+            -q \
             -r resolvers.txt \
             --resolvers-trusted resolvers-trusted.txt \
             --rate-limit 4000 \
