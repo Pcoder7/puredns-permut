@@ -56,7 +56,7 @@ jobs:
             -i "$BASE_LIST" \
             -c 20 \
             -prefix gotator1097 \
-            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -silent | anew -q "{}.txt"'
+            -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -silent | anew -q "-nono-{}.txt"'
 
           cat "$TMPDIR"/chrunk-data/gotator1097-*.txt | anew -q subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
