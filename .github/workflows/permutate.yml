@@ -8,7 +8,7 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 175000
+  LINES_PER_CHUNK: 750000
   PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
   # Define Account 2 repo details here or get from secrets for more flexibility
   ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
@@ -52,14 +52,14 @@ jobs:
           fi
 
           echo "Using TMPDIR=$TMPDIR for chunk outputs"
-          chrunk -p 20 \
+          chrunk -s 15 \
             -i "$BASE_LIST" \
-            -c 20 \
-            -prefix gotator007 \
+            -c 30 \
+            -prefix gotator009 \
             -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -mindup -silent | anew -q "{}-lola.txt"'
 
-          wc "$TMPDIR"/chrunk-data/gotator007-*.txt
-          cat "$TMPDIR"/chrunk-data/gotator007-*.txt | uniq > subdomains.txt
+          wc "$TMPDIR"/chrunk-data/gotator009-*.txt
+          cat "$TMPDIR"/chrunk-data/gotator009-*.txt | uniq > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
           wc subdomains.txt
           
@@ -497,7 +497,7 @@ jobs:
             --rate-limit-trusted 100 \
             --write "$PUREDNS_OUT" \
             --write-wildcards "$WILDCARD_FILE" \
-            --wildcard-batch 100000 --wildcard-tests 250
+            --wildcard-batch 1000000 --wildcard-tests 500
             
 
           puredns_exit=$?
