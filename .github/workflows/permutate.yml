@@ -1,5 +1,3 @@
-name: Distributed PureDNS - Dispatcher
-
 on:
   workflow_dispatch:
 
@@ -8,11 +6,20 @@ permissions:
   actions: write    # For triggering workflows in Account 2's repository
 
 env:
-  LINES_PER_CHUNK: 745000
-  PRIMARY_ACCOUNT_MAX_PARALLEL: 20 # Max parallel jobs for THIS account's resolve job
+  # --- Chunking and Distribution Configuration ---
+  LINES_PER_CHUNK: 5500 # Unchanged from original
+  DISTRIBUTION_THRESHOLD: 21    # NEW: The minimum total chunks to trigger 3-way distribution
+  PRIMARY_PERCENTAGE: 30        # NEW: 30% for the primary account
+  SECONDARY_PERCENTAGE: 30      # NEW: 30% for the secondary account
+
   # Define Account 2 repo details here or get from secrets for more flexibility
-  ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Fallback for testing
-  ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'puredns-resolve' }} # Fallback for testing
+  # --- Account 2 Details ---
+  ACCOUNT2_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER || 'pushrockzz' }} # Unchanged from original
+  ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'puredns-resolve' }} # Unchanged from original
+
+  # --- Account 3 Details ---
+  ACCOUNT3_REPO_OWNER: ${{ vars.ACCOUNT3_REPO_OWNER || 'Sari2705' }}      # NEW
+  ACCOUNT3_REPO_NAME: ${{ vars.ACCOUNT3_REPO_NAME || 'puredns-resolve' }} # NEW
 
 jobs:
   prepare_all_chunks_and_package:
@@ -39,27 +46,23 @@ jobs:
         run: |
           # Point all Go/chrunk temp files into the Actions temp area:
           export TMPDIR="$RUNNER_TEMP"
-
           BASE_LIST="navy-mil.txt"
           WORD_LIST="navy-mil-words.txt"
           [ -f "$BASE_LIST" ] && [ -f "$WORD_LIST" ] || { echo "Missing inputs"; exit 1; }
-
           if command -v gotator &> /dev/null; then
             echo "gotator is already installed"
           else
             echo "Installing gotator..."
             go install github.com/Josue87/gotator@latest
           fi
-
           echo "Using TMPDIR=$TMPDIR for chunk outputs"
-          chrunk -s 15 \
+          chrunk -p 20 \
             -i "$BASE_LIST" \
-            -c 30 \
-            -prefix gotator009 \
+            -c 20 \
+            -prefix gotator007 \
             -cmd 'gotator -sub "{}" -depth 1 -perm '"$WORD_LIST"' -adv -md -mindup -silent | anew -q "{}-lola.txt"'
-
-          wc "$TMPDIR"/chrunk-data/gotator009-*.txt
-          cat "$TMPDIR"/chrunk-data/gotator009-*.txt | uniq > subdomains.txt
+          wc "$TMPDIR"/chrunk-data/gotator007-*.txt
+          cat "$TMPDIR"/chrunk-data/gotator007-*.txt | uniq > subdomains.txt
           echo "subdomains.txt has $(wc -l < subdomains.txt) lines"
           wc subdomains.txt
           
@@ -90,7 +93,6 @@ jobs:
             split --version || echo "DEBUG: Could not get split version."
           fi
           echo "-----------------------------------------------------"
-
       - name: Build Full Matrix & Create Chunks
         id: build_full_matrix
         shell: bash
@@ -98,28 +100,23 @@ jobs:
           # --- Start of Script ---
           JSON_MATRIX='[]' # Initialize as an empty JSON array string
           echo "INFO: Initializing JSON_MATRIX as: '$JSON_MATRIX'"
-
           echo "INFO: Locating 'subdomains.txt' files..."
           find . -type f -name "subdomains.txt" -print0 > found_files.tmp
-
           declare -a files=() # Explicitly declare as an array
           while IFS= read -r -d $'\0' file_path_from_find; do
             standardized_file_path=$(echo "$file_path_from_find" | sed 's|^\./||')
             files+=("$standardized_file_path")
           done < found_files.tmp
           rm found_files.tmp # Clean up temporary file
-
           if [ "${#files[@]}" -eq 0 ]; then
             echo "WARNING: No 'subdomains.txt' files found in the repository."
             echo "INFO: JSON_MATRIX will remain '[]'. No chunks will be generated."
           else
             echo "INFO: Found ${#files[@]} 'subdomains.txt' file(s):"
             printf "  => '%s'\n" "${files[@]}" # Print each found file for clarity
-
             for file_path in "${files[@]}"; do
               echo "-----------------------------------------------------"
               echo "INFO: Processing file: '$file_path'"
-
               domain_dir=$(dirname "$file_path")
               if [ "$domain_dir" == "." ]; then
                 domain=$(basename "$file_path" .txt)
@@ -127,7 +124,6 @@ jobs:
                 domain=$(basename "$domain_dir")
               fi
               echo "INFO: Deduced domain: '$domain'"
-
               if [ ! -f "$file_path" ]; then
                 echo "ERROR: File '$file_path' reported by find, but not found now. Skipping."
                 continue
@@ -136,10 +132,8 @@ jobs:
                 echo "WARNING: File '$file_path' is empty. Skipping splitting for this file."
                 continue
               fi
-
               echo "INFO: Creating chunk directory 'chunks/$domain' if it doesn't exist."
               mkdir -p "chunks/$domain"
-
               output_chunk_prefix="chunks/$domain/chunk_"
               echo "INFO: Splitting '$file_path' into chunks in 'chunks/$domain/' with prefix '$output_chunk_prefix' (max $LINES_PER_CHUNK lines/chunk)"
               
@@ -153,7 +147,6 @@ jobs:
               CHUNK_COUNT_FOR_THIS_FILE=0
               while IFS= read -r chunk_file_path; do
                 if [ -z "$chunk_file_path" ]; then continue; fi
-
                 echo "DEBUG: Processing chunk_file_path: '$chunk_file_path' for domain '$domain'"
                 echo "DEBUG: Current JSON_MATRIX before jq (first 100 chars): $(echo "$JSON_MATRIX" | head -c 100)"
                 echo "DEBUG: Validating current JSON_MATRIX with jq -e:"
@@ -179,7 +172,6 @@ jobs:
                 echo "DEBUG: jq command to be run: printf '%s' \"\$JSON_MATRIX\" | jq -c --arg d \"$domain\" --arg c \"$chunk_file_path\" '. + [{domain:\$d,chunk:\$c}]'"
                 TEMP_JSON_MATRIX=$(printf '%s' "$JSON_MATRIX" | jq -c --arg d "$domain" --arg c "$chunk_file_path" '. + [{domain:$d,chunk:$c}]')
                 jq_exit_code=$?
-
                 if [ $jq_exit_code -ne 0 ]; then
                   echo "ERROR: jq command failed (exit code $jq_exit_code) when trying to add chunk '$chunk_file_path' for domain '$domain'."
                   echo "ERROR: Input JSON_MATRIX was (first 100 chars): $(echo "$JSON_MATRIX" | head -c 100)"
@@ -209,12 +201,10 @@ jobs:
                       continue 
                   fi
                 fi
-
                 JSON_MATRIX="$TEMP_JSON_MATRIX"
                 CHUNK_COUNT_FOR_THIS_FILE=$((CHUNK_COUNT_FOR_THIS_FILE + 1))
                 echo "DEBUG: Successfully added/updated for chunk '$chunk_file_path'. JSON_MATRIX (first 100 chars): $(echo "$JSON_MATRIX" | head -c 100)"
               done < <(find "chunks/$domain/" -name 'chunk_*' -type f -print)
-
               if [ "$CHUNK_COUNT_FOR_THIS_FILE" -eq 0 ]; then
                 echo "WARNING: No chunk files were processed/added to matrix for '$file_path' in domain '$domain'. 'split' might have created no files, or 'jq' failed for all."
               else
@@ -222,7 +212,6 @@ jobs:
               fi
             done
           fi
-
           echo "-----------------------------------------------------"
           if ! echo "$JSON_MATRIX" | jq -e . > /dev/null 2>&1; then
             echo "ERROR: Final JSON_MATRIX is not valid JSON. Content (first 200 chars): $(echo "$JSON_MATRIX" | head -c 200)"
@@ -232,13 +221,10 @@ jobs:
           else
             TOTAL_CHUNKS=$(echo "$JSON_MATRIX" | jq 'length')
           fi
-
           echo "FINAL_BUILD_INFO: Final JSON_MATRIX content (first 200 chars): $(echo "$JSON_MATRIX" | head -c 200)"
           echo "FINAL_BUILD_INFO: Total chunks in matrix: $TOTAL_CHUNKS"
-
           echo "INFO: Writing the final matrix to 'full_matrix.json' file..."
           echo "$JSON_MATRIX" > full_matrix.json
-
           if [ -f full_matrix.json ]; then
             echo "VERIFY: 'full_matrix.json' created. Size: $(wc -c < full_matrix.json) bytes."
             echo "VERIFY: Content preview of 'full_matrix.json' (first 200 chars): $(head -c 200 full_matrix.json)"
@@ -252,10 +238,9 @@ jobs:
             echo "INFO: Forcing 'full_matrix.json' to be '[]' as a fallback to prevent tar error."
             echo "[]" > full_matrix.json
           fi
-
           echo "full_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
           echo "total_chunks=$TOTAL_CHUNKS" >> $GITHUB_OUTPUT                 
-
+     
       - name: Package All Chunks and Resolvers      
         id: package_chunks # This ID is referenced by outputs and later steps
         if: steps.build_full_matrix.outputs.total_chunks > 0
@@ -265,7 +250,6 @@ jobs:
           BASE_ARTIFACT_NAME="all-chunks-package-${{ github.run_id }}"
           # Define the full tar filename
           PACKAGE_TAR_FILENAME="${BASE_ARTIFACT_NAME}.tar.gz"
-
           echo "INFO: Preparing package '$PACKAGE_TAR_FILENAME'..."
           # Ensure resolver files and full_matrix.json exist, create fallbacks if not
           if [ ! -f resolvers.txt ]; then echo "WARNING: resolvers.txt not found, creating default." >&2; echo '1.1.1.1' > resolvers.txt; fi
@@ -288,7 +272,7 @@ jobs:
           echo "package_tar_filename=$PACKAGE_TAR_FILENAME" >> $GITHUB_OUTPUT
           # Output the base artifact name (without .tar.gz) for the 'name' in upload-artifact and for job output
           echo "base_artifact_name=$BASE_ARTIFACT_NAME" >> $GITHUB_OUTPUT
-
+      
       - name: Upload Full Chunks Package
         if: steps.build_full_matrix.outputs.total_chunks > 0 && steps.package_chunks.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -306,52 +290,80 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       primary_matrix_json: ${{ steps.calculate_distribution.outputs.primary_matrix }}
+      secondary_matrix_json: ${{ steps.calculate_distribution.outputs.secondary_matrix }}
+      tertiary_matrix_json: ${{ steps.calculate_distribution.outputs.tertiary_matrix }}
       secondary_processing_triggered: ${{ steps.trigger_secondary.outcome == 'success' && steps.calculate_distribution.outputs.secondary_chunks_exist == 'true' }}
+      tertiary_processing_triggered: ${{ steps.trigger_tertiary.outcome == 'success' && steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true' }}
+   
     steps:
       - name: Calculate Chunk Distribution for Accounts
         id: calculate_distribution
         shell: bash
         run: |
           ALL_CHUNKS_JSON='${{ needs.prepare_all_chunks_and_package.outputs.all_chunks_matrix_json }}'
-          PRIMARY_MAX_PARALLEL=${{ env.PRIMARY_ACCOUNT_MAX_PARALLEL }}
-          
-          echo "Full matrix (first 200 chars): $(echo "$ALL_CHUNKS_JSON" | head -c 200)"
-          echo "Primary account max parallel: $PRIMARY_MAX_PARALLEL"
+          TOTAL_CHUNKS=${{ needs.prepare_all_chunks_and_package.outputs.total_chunks_count }}
+          THRESHOLD=${{ env.DISTRIBUTION_THRESHOLD }}
 
-          # Chunks for Account 1 (Primary)
-          CHUNKS_FOR_PRIMARY=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson limit "$PRIMARY_MAX_PARALLEL" '.[0:$limit]')
-          echo "primary_matrix=$CHUNKS_FOR_PRIMARY" >> $GITHUB_OUTPUT
-          echo "Primary matrix (first 200 chars): $(echo "$CHUNKS_FOR_PRIMARY" | head -c 200)"
+          echo "Total chunks generated: $TOTAL_CHUNKS"
+          echo "Distribution threshold: $THRESHOLD"
 
-          # Chunks for Account 2 (Secondary)
-          CHUNKS_FOR_SECONDARY=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson offset "$PRIMARY_MAX_PARALLEL" '.[$offset:]')
-          SECONDARY_COUNT=$(echo "$CHUNKS_FOR_SECONDARY" | jq 'length')
-
-          if [ "$SECONDARY_COUNT" -eq 0 ]; then
-            echo "No chunks remaining for secondary account."
-            echo "secondary_matrix=[]" >> $GITHUB_OUTPUT
-            echo "secondary_chunks_exist=false" >> $GITHUB_OUTPUT
+          if [ "$TOTAL_CHUNKS" -lt "$THRESHOLD" ]; then
+            # --- STRATEGY 1: Below Threshold -> Assign all to Primary ---
+            echo "Total chunks are below threshold. Assigning all work to Primary Account."
+            PRIMARY_CHUNKS_JSON="$ALL_CHUNKS_JSON"
+            SECONDARY_CHUNKS_JSON="[]"
+            TERTIARY_CHUNKS_JSON="[]"
           else
-            echo "Secondary matrix (first 200 chars): $(echo "$CHUNKS_FOR_SECONDARY" | head -c 200)"
-            echo "secondary_matrix=$CHUNKS_FOR_SECONDARY" >> $GITHUB_OUTPUT
-            echo "secondary_chunks_exist=true" >> $GITHUB_OUTPUT
+            # --- STRATEGY 2: At or Above Threshold -> Apply Percentage Split ---
+            echo "Total chunks are at or above threshold. Applying 30-30-40 percentage split."
+            PRIMARY_PERCENT=${{ env.PRIMARY_PERCENTAGE }}
+            SECONDARY_PERCENT=${{ env.SECONDARY_PERCENTAGE }}
+
+            PRIMARY_CHUNK_COUNT=$(echo "($TOTAL_CHUNKS * $PRIMARY_PERCENT) / 100" | bc)
+            SECONDARY_CHUNK_COUNT=$(echo "($TOTAL_CHUNKS * $SECONDARY_PERCENT) / 100" | bc)
+
+            echo "Calculated counts: Primary=$PRIMARY_CHUNK_COUNT, Secondary=$SECONDARY_CHUNK_COUNT, Tertiary gets the rest."
+            OFFSET_FOR_TERTIARY=$((PRIMARY_CHUNK_COUNT + SECONDARY_CHUNK_COUNT))
+
+            PRIMARY_CHUNKS_JSON=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson limit "$PRIMARY_CHUNK_COUNT" '.[0:$limit]')
+         
+            SECONDARY_CHUNKS_JSON=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson offset "$PRIMARY_CHUNK_COUNT" --argjson limit "$SECONDARY_CHUNK_COUNT" '.[$offset : $offset+$limit]')
+                   
+          
+            TERTIARY_CHUNKS_JSON=$(echo "$ALL_CHUNKS_JSON" | jq -c --argjson offset "$OFFSET_FOR_TERTIARY" '.[$offset:]')
+ 
           fi
+          # Set outputs based on the chosen strategy
+          echo "primary_matrix=$PRIMARY_CHUNKS_JSON" >> $GITHUB_OUTPUT
+          
+          if [ "$(echo "$SECONDARY_CHUNKS_JSON" | jq 'length')" -eq 0 ]; then
+            echo "secondary_matrix=[]" >> $GITHUB_OUTPUT; echo "secondary_chunks_exist=false" >> $GITHUB_OUTPUT
+          else
+            echo "secondary_matrix=$SECONDARY_CHUNKS_JSON" >> $GITHUB_OUTPUT; echo "secondary_chunks_exist=true" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ "$(echo "$TERTIARY_CHUNKS_JSON" | jq 'length')" -eq 0 ]; then
+            echo "tertiary_matrix=[]" >> $GITHUB_OUTPUT; echo "tertiary_chunks_exist=false" >> $GITHUB_OUTPUT
+          else
+            echo "tertiary_matrix=$TERTIARY_CHUNKS_JSON" >> $GITHUB_OUTPUT; echo "tertiary_chunks_exist=true" >> $GITHUB_OUTPUT
+          fi
+          echo "Distribution calculation complete."
+
+
       
-      - name: Prepare Trigger Payload
-        id: prepare_payload
+      - name: Prepare Trigger Payload For Secondary
+        id: prepare_payload_secondary
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
         shell: bash
         run: |
           # Ensure the secondary_matrix output from the previous step is treated as a string
           # that already represents a JSON array. jq's --argjson will parse it.
-          SECONDARY_MATRIX_AS_STRING='${{ steps.calculate_distribution.outputs.secondary_matrix }}'
-
-          # Validate that SECONDARY_MATRIX_AS_STRING is actually valid JSON before --argjson
-          if ! echo "${SECONDARY_MATRIX_AS_STRING}" | jq -e . > /dev/null 2>&1; then
-            echo "::error title=Invalid Secondary Matrix::The secondary_matrix output ('${SECONDARY_MATRIX_AS_STRING}') is not valid JSON. Defaulting to empty array."
-            SECONDARY_MATRIX_AS_STRING="[]" # Fallback to an empty JSON array string
+          MATRIX_AS_STRING='${{ steps.calculate_distribution.outputs.secondary_matrix }}'
+          # Validate that MATRIX_AS_STRING is actually valid JSON before --argjson
+          if ! echo "$MATRIX_AS_STRING}" | jq -e . > /dev/null 2>&1; then
+            echo "::error title=Invalid Secondary Matrix::The secondary_matrix output ('${MATRIX_AS_STRING}') is not valid JSON. Defaulting to empty array."
+            MATRIX_AS_STRING="[]" # Fallback to an empty JSON array string
           fi
-
           # Construct the entire payload as a valid JSON string using jq
           # --argjson tells jq to parse the value of matrix_json as JSON, not treat it as a literal string
           JSON_PAYLOAD=$(jq -cn \
@@ -368,7 +380,7 @@ jobs:
             --arg repo_name "${{ github.event.repository.name }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg artifact_name "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}" \
-            --arg matrix_as_a_string "${SECONDARY_MATRIX_AS_STRING}" \
+            --arg matrix_as_a_string "${MATRIX_AS_STRING}" \
             '{
               "primary_github_server_url": $server_url,
               "primary_repo_owner": $repo_owner,
@@ -382,14 +394,12 @@ jobs:
           # Set the constructed JSON string as an output of this step
           echo "json_string=$JSON_PAYLOAD" >> $GITHUB_OUTPUT
       
-      - name: DEBUG - Show Exact Inputs String
-        id: debug_show_inputs
+      - name: DEBUG - Show Secondary Inputs String
+        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
         run: |
-          INPUTS_STRING="${{ steps.prepare_payload.outputs.json_string }}"
-          echo "DEBUG: Exact string value being passed to 'inputs':"
-          echo "$INPUTS_STRING"
-          echo "DEBUG: Length of inputs string: ${#INPUTS_STRING}"
-
+          echo "DEBUG: Inputs for SECONDARY account:"
+          echo "${{ steps.prepare_payload_secondary.outputs.json_string }}"
+      
       - name: Trigger Secondary Account Workflow
         id: trigger_secondary 
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
@@ -398,8 +408,63 @@ jobs:
           workflow: resolve.yml 
           repo: ${{ env.ACCOUNT2_REPO_OWNER }}/${{ env.ACCOUNT2_REPO_NAME }}
           token: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }}
-          inputs: ${{ steps.prepare_payload.outputs.json_string }}
+          inputs: ${{ steps.prepare_payload_secondary.outputs.json_string }}
           ref: main # Or your default branch name in Account 2
+
+
+      - name: Prepare Trigger Payload For Tertiary
+        # This is a NEW step, a copy of the secondary payload step for Account 3.
+        id: prepare_payload_tertiary
+        if: steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true'
+        shell: bash
+        run: |
+          MATRIX_AS_STRING='${{ steps.calculate_distribution.outputs.tertiary_matrix }}'
+          JSON_PAYLOAD=$(jq -cn \
+            --arg run_id "${{ github.run_id }}" \
+            '{
+              "primary_run_id": $run_id
+            }')
+             echo "Constructed JSON Payload: $JSON_PAYLOAD"
+             echo "json_string=$JSON_PAYLOAD" >> "$GITHUB_OUTPUT"
+           
+          JSON_PAYLOAD=$(jq -cn \
+            --arg server_url "${{ github.server_url }}" \
+            --arg repo_owner "${{ github.repository_owner }}" \
+            --arg repo_name "${{ github.event.repository.name }}" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg artifact_name "${{ needs.prepare_all_chunks_and_package.outputs.chunk_package_artifact_name }}" \
+            --arg matrix_as_a_string "${MATRIX_AS_STRING}" \
+            '{
+              "primary_github_server_url": $server_url,
+              "primary_repo_owner": $repo_owner,
+              "primary_repo_name": $repo_name,
+              "primary_run_id": $run_id,
+              "chunk_package_artifact_name": $artifact_name,
+              "secondary_matrix_json": $matrix_as_a_string 
+            }')
+          
+          echo "Constructed JSON Payload: $JSON_PAYLOAD"
+          # Set the constructed JSON string as an output of this step
+          echo "json_string=$JSON_PAYLOAD" >> $GITHUB_OUTPUT
+
+      - name: DEBUG - Show Tertiary Inputs String
+        if: steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true'
+        run: |
+          echo "DEBUG: Inputs for TERTIARY account:"
+          echo "${{ steps.prepare_payload_tertiary.outputs.json_string }}"    
+
+      - name: Trigger Tertiary Account Workflow
+        # This is a NEW step, a copy of the secondary trigger step for Account 3.
+        id: trigger_tertiary
+        if: steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: resolve.yml
+          repo: ${{ env.ACCOUNT3_REPO_OWNER }}/${{ env.ACCOUNT3_REPO_NAME }}
+          token: ${{ secrets.PAT_FOR_TERTIARY_ACCOUNT_REPO }}
+          inputs: ${{ steps.prepare_payload_tertiary.outputs.json_string }}
+          ref: main
+
 
   resolve_primary_account_chunks:
     name: Resolve Primary Account Chunks (puredns + dsieve)
@@ -438,8 +503,6 @@ jobs:
           fi
           echo "Extraction complete. 'chunks/' should be present."
           ls -R chunks/
-
-
       - name: Install dsieve
         run: |
           if command -v dsieve &> /dev/null; then
@@ -452,7 +515,6 @@ jobs:
       - name: Fetch wordlists
         shell: bash
         run: |
-
           if [ ! -f resolvers.txt ]; then
               wget -qO resolvers.txt \
               https://raw.githubusercontent.com/rix4uni/resolvers/refs/heads/main/resolvers.txt
@@ -463,62 +525,49 @@ jobs:
               https://raw.githubusercontent.com/and0x00/resolvers.txt/refs/heads/main/resolvers.txt
               echo "resolvers-trusted.txt is downloaded"
           fi          
-
       - name: Run puredns + pre-dsieve on subdomains + final filtering
         shell: bash
         run: |
           DOMAIN=${{ matrix.pair.domain }}
           CHUNK_FILE_PATH=${{ matrix.pair.chunk }}   # e.g. "chunks/example.com/chunk_001"
           echo "Processing domain '$DOMAIN' with chunk '$CHUNK_FILE_PATH'..."
-
           if [ ! -f "$CHUNK_FILE_PATH" ]; then
             echo "ERROR: Chunk file '$CHUNK_FILE_PATH' not found!"
             exit 1
           fi
-
           # ───────────────────────────────────────────────────────────
           # Step A: pre-dsieve on the raw subdomain chunk (no puredns yet)
           # ───────────────────────────────────────────────────────────
           echo "-> Generating parent_domains.txt from raw subdomains..."
           dsieve -if "$CHUNK_FILE_PATH" -f 2 | sort -u > parent_domains.txt
-
           echo "  Parents in this chunk: $(wc -l < parent_domains.txt)"
           head -n 5 parent_domains.txt || true
-
           # ───────────────────────────────────────────────────────────
           # Step B: Probe all subdomains in this chunk with puredns
           # ───────────────────────────────────────────────────────────
           PUREDNS_OUT="puredns_output.txt"
           echo "-> Running puredns against '$CHUNK_FILE_PATH'..."
           puredns resolve "$CHUNK_FILE_PATH" \
-            -q \
             -r resolvers.txt \
             --resolvers-trusted resolvers-trusted.txt \
-            --rate-limit 4000 \
-            --rate-limit-trusted 100 \
             --write "$PUREDNS_OUT" \
             --write-wildcards "$WILDCARD_FILE" \
-            --wildcard-batch 1000000 --wildcard-tests 500
+            --wildcard-batch 100000 --wildcard-tests 250
             
-
           puredns_exit=$?
           if [ $puredns_exit -ne 0 ]; then
             echo "ERROR: puredns returned exit code $puredns_exit. Aborting chunk."
             exit 1
           fi
-
           # Always create results/ so upload-artifact sees at least an empty folder
           OUTPUT_ROOT="results"
           mkdir -p "$OUTPUT_ROOT"
-
           if [ ! -s "$PUREDNS_OUT" ]; then
             echo "No live hostnames found in this chunk. Leaving results/ empty."
             exit 0
           fi
-
           echo "-> Sample of puredns_output.txt (first 5 lines):"
           head -n 5 "$PUREDNS_OUT" || true
-
           # ───────────────────────────────────────────────────────────
           # Step C+D: For each parent domain, filter matching hostnames
           # ───────────────────────────────────────────────────────────
@@ -530,13 +579,10 @@ jobs:
               echo "DEBUG: Skipping empty parent line"
               continue
             fi
-
             echo "DEBUG: Processing parent => [[$clean_parent]]"
             mkdir -p "$OUTPUT_ROOT/$clean_parent"
             outfile="$OUTPUT_ROOT/$clean_parent/puredns_result.txt"
-
             echo "DEBUG: AWK filtering host==$clean_parent or subdomain of $clean_parent from $PUREDNS_OUT into $outfile"
-
             awk -v b="$clean_parent" '
             {
               host = $1
@@ -551,7 +597,6 @@ jobs:
               echo "DEBUG: Contents of /tmp/awk_error.log:"
               cat /tmp/awk_error.log || true
             fi
-
             if [ -f "$outfile" ]; then
               lines_written=$(wc -l < "$outfile")
               echo "DEBUG: '$outfile' contains $lines_written line(s)."
@@ -564,9 +609,7 @@ jobs:
             else
               echo "DEBUG: '$outfile' was not created."
             fi
-
           done < parent_domains.txt
-
           echo "-> Split complete for domain '$DOMAIN'."
           # Always create a results/ directory (so upload-artifact never complains about “no files”)
           mkdir -p results
@@ -615,7 +658,6 @@ jobs:
         run: |
           echo "Organizing primary results..."
           git config --global --add safe.directory "$(pwd)"
-
           # First, collect all chunk outputs into the runner’s results/ folder
           mkdir -p results
           find temp_results -type f -name "puredns_result.txt" | while read -r filepath; do
@@ -624,26 +666,21 @@ jobs:
             cat "$filepath" | anew -q "results/$parent/puredns_result.txt"
             echo "WORKFLOW RUN: 'results/$parent/puredns_result.txt' contains $(wc -l < "results/$parent/puredns_result.txt") valid domains for parent $parent."
           done || true
-
           # If the runner’s results/ is empty, nothing to push
           if [ ! -d "results" ] || [ -z "$(ls -A results)" ]; then
             echo "No results to push."
             exit 0
           fi
-
           # Configure Git identity for commits
           git config --global user.name "Account2 PureDNS Bot"
           git config --global user.email "actions-bot@users.noreply.github.com"
-
           # Clone the private store-recon repo from Account 2
           TMP_DIR="$(mktemp -d)"
           echo "Cloning store-recon into $TMP_DIR"
           git clone "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" "$TMP_DIR"
           cd "$TMP_DIR" || exit 1
-
           # Ensure a top-level results/ exists in the cloned repo
           mkdir -p results
-
           # Retry up to 10 times to handle races on main
           for i in {1..10}; do
             git fetch origin main
@@ -658,13 +695,11 @@ jobs:
               cat "$filepath" | anew -q "results/$rel"
               echo "DEBUG: 'results/$rel' now has $(wc -l < "results/$rel") lines."
             done
-
             git add results/
             if git diff --cached --quiet; then
               echo "No changes to commit in store-recon."
               exit 0
             fi
-
             git commit -m "Primary puredns+dsieve results (Run: ${{ github.event.inputs.primary_run_id || github.run_id }})"
             if git push origin main; then
               echo "Pushed to store-recon successfully on attempt #$i."
@@ -674,7 +709,6 @@ jobs:
               git reset --hard origin/main
             fi
           done
-
           echo "ERROR: Could not push results to store-recon after 10 attempts."
           exit 1      
       
