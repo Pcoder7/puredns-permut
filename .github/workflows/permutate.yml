@@ -360,7 +360,7 @@ jobs:
           # that already represents a JSON array. jq's --argjson will parse it.
           MATRIX_AS_STRING='${{ steps.calculate_distribution.outputs.secondary_matrix }}'
           # Validate that MATRIX_AS_STRING is actually valid JSON before --argjson
-          if ! echo "$MATRIX_AS_STRING}" | jq -e . > /dev/null 2>&1; then
+          if ! echo "${MATRIX_AS_STRING}" | jq -e . > /dev/null 2>&1; then
             echo "::error title=Invalid Secondary Matrix::The secondary_matrix output ('${MATRIX_AS_STRING}') is not valid JSON. Defaulting to empty array."
             MATRIX_AS_STRING="[]" # Fallback to an empty JSON array string
           fi
