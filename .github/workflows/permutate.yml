@@ -18,8 +18,8 @@ env:
   ACCOUNT2_REPO_NAME: ${{ secrets.ACCOUNT2_REPO_NAME || 'puredns-resolve' }} # Unchanged from original
 
   # --- Account 3 Details ---
-  ACCOUNT3_REPO_OWNER: ${{ vars.ACCOUNT3_REPO_OWNER || 'Sari2705' }}      # NEW
-  ACCOUNT3_REPO_NAME: ${{ vars.ACCOUNT3_REPO_NAME || 'puredns-resolve' }} # NEW
+  ACCOUNT3_REPO_OWNER: ${{ secrets.ACCOUNT3_REPO_OWNER || 'Sari2705' }}      # NEW
+  ACCOUNT3_REPO_NAME: ${{ secrets.ACCOUNT3_REPO_NAME || 'puredns-resolve' }} # NEW
 
 jobs:
   prepare_all_chunks_and_package:
