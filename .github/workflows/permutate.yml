@@ -630,7 +630,7 @@ jobs:
   commit_all_primary_results:
     name: Commit All Primary Results
     needs: resolve_primary_account_chunks
-    if: always()
+    if: always() && github.event.inputs.secondary_matrix_json != '' && github.event.inputs.secondary_matrix_json != '[]'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/pcoder7/spider-puredns-actions:latest
