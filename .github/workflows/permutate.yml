@@ -398,7 +398,7 @@ jobs:
         if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
         run: |
           echo "DEBUG: Inputs for SECONDARY account:"
-          echo "${{ steps.prepare_payload_secondary.outputs.json_string }}"
+          #echo "${{ steps.prepare_payload_secondary.outputs.json_string }}"
       
       - name: Trigger Secondary Account Workflow
         id: trigger_secondary 
@@ -451,7 +451,7 @@ jobs:
         if: steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true'
         run: |
           echo "DEBUG: Inputs for TERTIARY account:"
-          echo "${{ steps.prepare_payload_tertiary.outputs.json_string }}"    
+          # echo "${{ steps.prepare_payload_tertiary.outputs.json_string }}"    
 
       - name: Trigger Tertiary Account Workflow
         # This is a NEW step, a copy of the secondary trigger step for Account 3.
