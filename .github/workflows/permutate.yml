@@ -7,7 +7,7 @@ permissions:
 
 env:
   # --- Chunking and Distribution Configuration ---
-  LINES_PER_CHUNK: 400000 # Unchanged from original
+  LINES_PER_CHUNK: 200000 # Unchanged from original
   DISTRIBUTION_THRESHOLD: 21    # NEW: The minimum total chunks to trigger 3-way distribution
   PRIMARY_PERCENTAGE: 45        # NEW: 30% for the primary account
   SECONDARY_PERCENTAGE: 40      # NEW: 30% for the secondary account
@@ -96,7 +96,7 @@ jobs:
             DYNAMIC_WORDLIST="${TMPDIR}/${ROOT_DOMAIN}-wordlist.txt"
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
-            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 200| awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
+            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 300 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
 
             DYNAMIC_WORD_COUNT=$(wc -l < "$DYNAMIC_WORDLIST")
             if [ "$DYNAMIC_WORD_COUNT" -eq 0 ]; then
@@ -112,7 +112,7 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                GOTATOR_CMD="gotator -sub {} -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -mindup -silent > {}-gotator.txt"
+                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -mindup -silent | uniq > {}-gotator.txt"
 
                 chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
                 
