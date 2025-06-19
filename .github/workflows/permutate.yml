@@ -179,8 +179,8 @@ jobs:
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
             dsieve -if "$TEMP_BASE_LIST" -f 3 -top 1000 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
-            dsieve -if "$TEMP_BASE_LIST" -f 4 -top 500 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
-            dsieve -if "$TEMP_BASE_LIST" -f 5 -top 200 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
+            #dsieve -if "$TEMP_BASE_LIST" -f 4 -top 500 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
+            #dsieve -if "$TEMP_BASE_LIST" -f 5 -top 200 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
             
             DYNAMIC_WORD_COUNT=$(wc -l < "$DYNAMIC_WORDLIST")
             if [ "$DYNAMIC_WORD_COUNT" -eq 0 ]; then
