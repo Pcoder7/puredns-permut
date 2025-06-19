@@ -539,8 +539,8 @@ jobs:
       #====================================================================
       # ADD THE FIRST SLEEP STEP HERE
       # ====================================================================
-      - name: Add delay before triggering Trigger worker
-        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
+      - name: Add delay before triggering Tertiary Trigger worker
+        if: steps.calculate_distribution.outputs.tertiary_chunks_exist == 'true'
         run: |
           echo "Pausing for 30 seconds to space out worker triggers and avoid platform throttling..."
           sleep 30
