@@ -96,7 +96,7 @@ jobs:
             DYNAMIC_WORDLIST="${TMPDIR}/${ROOT_DOMAIN}-wordlist.txt"
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
-            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 300 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
+            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 1000 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
 
             DYNAMIC_WORD_COUNT=$(wc -l < "$DYNAMIC_WORDLIST")
             if [ "$DYNAMIC_WORD_COUNT" -eq 0 ]; then
@@ -141,7 +141,7 @@ jobs:
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
 
-                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
+                #GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
                 
                 chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
                 
