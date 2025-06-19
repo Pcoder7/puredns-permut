@@ -171,14 +171,15 @@ jobs:
           echo "INFO: Starting with $RAW_COUNT raw permutations."
           # In your terminal, run this exact loop:
           
-          echo "SUCCESS: All patterns in filter.txt are valid."
+          #echo "SUCCESS: All patterns in filter.txt are valid."
          
-          FINAL_COUNT=$(wc -l < subdomains.txt)
-          FILTERED_COUNT=$((RAW_COUNT - FINAL_COUNT))
+          #FINAL_COUNT=$(wc -l < subdomains.txt)
+          #FILTERED_COUNT=$((RAW_COUNT - FINAL_COUNT))
 
-          echo "INFO: Filtered out $FILTERED_COUNT subdomains."
-          echo "FINAL: The cleaned 'subdomains.txt' now contains $FINAL_COUNT permutations."
+          #echo "INFO: Filtered out $FILTERED_COUNT subdomains."
+          #echo "FINAL: The cleaned 'subdomains.txt' now contains $FINAL_COUNT permutations."
           rm -rf "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-*
+          cat raw_permutations.txt | anew -q subdomains.txt
           wc -l subdomains.txt
           
       - name: DEBUG - Verify Tools and Initial File System State
@@ -463,7 +464,16 @@ jobs:
             echo "tertiary_matrix=$TERTIARY_CHUNKS_JSON" >> $GITHUB_OUTPUT; echo "tertiary_chunks_exist=true" >> $GITHUB_OUTPUT
           fi
           echo "Distribution calculation complete."
-
+     
+      #====================================================================
+      # ADD THE FIRST SLEEP STEP HERE
+      # ====================================================================
+      - name: Add delay before triggering Secondary worker
+        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
+        run: |
+          echo "Pausing for 15 seconds to space out worker triggers and avoid platform throttling..."
+          sleep 15
+      # ====================================================================
 
       
       - name: Prepare Trigger Payload For Secondary
@@ -526,7 +536,15 @@ jobs:
           inputs: ${{ steps.prepare_payload_secondary.outputs.json_string }}
           ref: main # Or your default branch name in Account 2
 
-
+      #====================================================================
+      # ADD THE FIRST SLEEP STEP HERE
+      # ====================================================================
+      - name: Add delay before triggering Trigger worker
+        if: steps.calculate_distribution.outputs.secondary_chunks_exist == 'true'
+        run: |
+          echo "Pausing for 30 seconds to space out worker triggers and avoid platform throttling..."
+          sleep 30
+      # ====================================================================
       - name: Prepare Trigger Payload For Tertiary
         # This is a NEW step, a copy of the secondary payload step for Account 3.
         id: prepare_payload_tertiary
