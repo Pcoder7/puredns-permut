@@ -48,7 +48,7 @@ jobs:
         id: create_final_list
         shell: bash
         env:
-          STORE_RECON_PAT: ${{ secrets.STORE_RECON_PAT }}
+          STORE_RECON_PAT: ${{ secrets.PAT_FOR_SECONDRY }}
           STORE: ${{ secrets.STORE }}
           ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
         run: |
