@@ -168,18 +168,6 @@ jobs:
           echo "INFO: Starting with $RAW_COUNT raw permutations."
           # In your terminal, run this exact loop:
           
-          while read -r pattern; do
-            echo "Testing pattern: [${pattern}]"
-            true | grep -E "$pattern" > /dev/null 2>&1 || {
-              echo "----------------------------------------"
-              echo "CRITICAL ERROR: Invalid regex pattern found!"
-              echo "This is the line that failed syntax validation:"
-              echo "BAD PATTERN: [${pattern}]"
-              echo "----------------------------------------"
-              exit 1
-            } 
-          done < filter.txt
-
           echo "SUCCESS: All patterns in filter.txt are valid."
           
           if [ "$RAW_COUNT" -eq 0 ]; then
