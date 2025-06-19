@@ -186,7 +186,15 @@ jobs:
               echo "WARNING: No raw permutations were generated. Final subdomains.txt will be empty."
               touch subdomains.txt
           else
-              grep -ivE -f filter.txt raw_permutations.txt > subdomains.txt
+              grep -ivE -f - raw_permutations.txt > subdomains.txt <<-'EOF'
+                ^[0-9]{4,}
+                [a-zA-Z]+-?[0-9]*0{2,}[0-9]+
+                [a-zA-Z]+-?[0-9]{4,}
+                [a-zA-Z]+[0-9]{4,}
+                ([0-9]{1,3}[.-]){1,}[0-9]{1,3}
+                ([0-9]{1,3}[.-]){1,}[0-9]{1,3}-[a-zA-Z]
+                (^|\.)0{2,}[0-9]+(\.|[[:space:]]|$)
+              EOF
           fi
 
           FINAL_COUNT=$(wc -l < subdomains.txt)
@@ -412,7 +420,7 @@ jobs:
           name: ${{ steps.package_chunks.outputs.base_artifact_name }}
           # Use the full tar filename output from the 'package_chunks' step
           path: ${{ steps.package_chunks.outputs.package_tar_filename }}
-          retention-days: 2
+          retention-days: 1
 
   distribute_and_trigger_secondary:
     name: Distribute Work & Trigger Secondary
