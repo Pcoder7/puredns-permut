@@ -46,13 +46,13 @@ jobs:
         shell: bash
         env:
           STORE_RECON_PAT: ${{ secrets.STORE_RECON_PAT }}
-          STORE_REPO_OWNER: ${{ secrets.ACCOUNT2_REPO_OWNER }}
-          STORE_REPO_NAME: ${{ secrets.STORE }}
+          STORE: ${{ secrets.STORE }}
+          ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
         run: |
           set -e
           echo "INFO: Performing a fast, shallow clone of the results repository..."
           # A shallow clone is fine here because we only need the current state, not git history.
-          git clone --depth 1 "https://x-access-token:${{ env.STORE_RECON_PAT }}@github.com/${{ env.STORE_REPO_OWNER }}/${{ env.STORE_REPO_NAME }}.git" store-recon-temp
+          git clone --depth 1 "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" store-recon-temp
           
           echo "INFO: Aggregating all results into a master list..."
           if [ -d "store-recon-temp/results" ]; then
