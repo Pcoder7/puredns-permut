@@ -54,24 +54,13 @@ jobs:
           echo "INFO: Verifying input file..."
           [ -f "$MASTER_INPUT_LIST" ] || { echo "CRITICAL: Missing input file '$MASTER_INPUT_LIST'."; exit 1; }
 
-          echo "INFO: Verifying and installing required tools..."
-          # Install all dependencies in one block
-          go install github.com/Josue87/gotator@latest
-          pip3 install dnsgen
-          go install github.com/projectdiscovery/alterx/cmd/alterx@latest
-          go install github.com/projectdiscovery/utils/cmd/anew@latest
-          go install github.com/trickest/dsieve/cmd/dsieve@latest
 
-          # Verify all tools are in the PATH
-          for tool in gotator dnsgen alterx anew dsieve; do
-            command -v "$tool" >/dev/null || { echo "CRITICAL: Failed to find '$tool' in PATH after installation."; exit 1; }
-          done
-          echo "INFO: All tools are available."
+
           echo "-----------------------------------------------------"
 
           # --- PRE-PROCESSING: Extract Unique Root Domains ---
           echo "PRE-PROCESSING: Extracting unique root domains from '$MASTER_INPUT_LIST'..."
-          dsieve -if "$MASTER_INPUT_LIST" -f 1 | sort -u > unique_root_domains.txt
+          dsieve -if "$MASTER_INPUT_LIST" -f 2 | sort -u > unique_root_domains.txt
           ROOT_DOMAIN_COUNT=$(wc -l < unique_root_domains.txt)
           echo "INFO: Found $ROOT_DOMAIN_COUNT unique root domains to process."
           if [ "$ROOT_DOMAIN_COUNT" -eq 0 ]; then
@@ -107,7 +96,7 @@ jobs:
             DYNAMIC_WORDLIST="${TMPDIR}/${ROOT_DOMAIN}-wordlist.txt"
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
-            dsieve -if "$TEMP_BASE_LIST" -f 3,4 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
+            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 200| awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' > "$DYNAMIC_WORDLIST"
 
             DYNAMIC_WORD_COUNT=$(wc -l < "$DYNAMIC_WORDLIST")
             if [ "$DYNAMIC_WORD_COUNT" -eq 0 ]; then
