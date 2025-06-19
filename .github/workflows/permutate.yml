@@ -142,13 +142,17 @@ jobs:
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
 
                 echo "  -> Running gotator with xargs (8 parallel jobs)..."
+                
+                GOTATOR_PATH=$(command -v gotator)
+                echo "    - Found gotator at: $GOTATOR_PATH"
 
-                # Define the temporary file to hold all results from the parallel gotator runs
+                # Define the temporary file for the results
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 
-                # To make the $DYNAMIC_WORDLIST variable available to the sub-shells started by xargs,
-                # we export it. This is the cleanest way to handle variables in xargs with sh -c.
+                # STEP 2: Export the variables that the sub-shells will need.
+                # This includes our new path variable and the wordlist path.
                 export DYNAMIC_WORDLIST
+                export GOTATOR_PATH
 
                 # The main command:
                 # 1. cat "$TEMP_BASE_LIST": Reads the list of base subdomains for this root domain.
@@ -156,11 +160,9 @@ jobs:
                 #    -I {} tells xargs to replace {} with the input line.
                 # 3. sh -c '...': Runs a new shell for each job. This is the most robust way to
                 #    handle complex commands with quotes and variables.
-                # 4. gotator -sub "{}" ...: The command to run. "{}" is the single subdomain from the list.
-                # 5. > "$GOTATOR_RESULTS_TMP": All output from all 8 parallel jobs is collected and
-                #    written to a single temporary results file.
+
                 cat "$TEMP_BASE_LIST" | xargs -P 8 -I {} \
-                  sh -c 'gotator -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -mindup -silent' > "$GOTATOR_RESULTS_TMP"
+                  sh -c '"$GOTATOR_PATH" -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -mindup -silent' > "$GOTATOR_RESULTS_TMP"
 
                 # Now, process the results file just like you do for dnsgen and alterx
                 # This keeps the logic consistent and provides good metrics.
