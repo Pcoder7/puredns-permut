@@ -112,13 +112,14 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -mindup -silent | uniq > {}-gotator.txt"
-
+                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
+                
                 chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
                 
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
                 cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
+                wc -l "$GOTATOR_RESULTS_TMP"
                 GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
                 echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
 
