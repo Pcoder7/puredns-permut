@@ -142,6 +142,7 @@ jobs:
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
 
                 echo "  -> Running gotator with xargs (8 parallel jobs)..."
+                gotator --help
                 echo "Location of gotator:"
                 which gotator
                 find / -type f -name gotator 2>/dev/null || echo "gotator not found by find"
