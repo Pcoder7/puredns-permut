@@ -143,6 +143,7 @@ jobs:
 
                 echo "  -> Running gotator with xargs (8 parallel jobs)..."
                 echo "Location of gotator:"
+                which gotator
                 find / -type f -name gotator 2>/dev/null || echo "gotator not found by find"
                 echo ""
                 GOTATOR_PATH=$(command -v gotator)
