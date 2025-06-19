@@ -112,16 +112,7 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                #GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
-                
-                #chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
-                
-                #GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
-                #cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
-                #cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
-                #wc -l "$GOTATOR_RESULTS_TMP"
-                #GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
-                #echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
+
 
                 # Stage 3b: Dnsgen
                 echo "  -> Running dnsgen with dynamic wordlist..."
@@ -131,8 +122,8 @@ jobs:
                 
                 DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
-                #DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
-                #echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
+                DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | sort -u | wc -l)
+                echo "    - Dnsgen generated $DNSGEN_UNIQUE_ADDITIONS found new unique subdomains."
                 cat "$DNSGEN_RESULTS_TMP" | anew -q all_permutations_temp.txt
                 
                 # Stage 3c: Alterx
@@ -149,6 +140,18 @@ jobs:
                 ALTERX_UNIQUE_ADDITIONS=$(cat "$ALTERX_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
+
+                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
+                
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
+                
+                GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
+                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
+                
+                wc -l "$GOTATOR_RESULTS_TMP"
+                GOTATOR_COUNT=$(cat "$GOTATOR_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
+                echo "    - Gotator found $GOTATOR_COUNT new unique subdomains"
+                cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
             # Clean up chrunk's temporary output directories for this root domain
@@ -169,22 +172,7 @@ jobs:
           # In your terminal, run this exact loop:
           
           echo "SUCCESS: All patterns in filter.txt are valid."
-          
-          if [ "$RAW_COUNT" -eq 0 ]; then
-              echo "WARNING: No raw permutations were generated. Final subdomains.txt will be empty."
-              touch subdomains.txt
-          else
-              grep -ivE -f - raw_permutations.txt > subdomains.txt <<-'EOF'
-                ^[0-9]{4,}
-                [a-zA-Z]+-?[0-9]*0{2,}[0-9]+
-                [a-zA-Z]+-?[0-9]{4,}
-                [a-zA-Z]+[0-9]{4,}
-                ([0-9]{1,3}[.-]){1,}[0-9]{1,3}
-                ([0-9]{1,3}[.-]){1,}[0-9]{1,3}-[a-zA-Z]
-                (^|\.)0{2,}[0-9]+(\.|[[:space:]]|$)
-              EOF
-          fi
-
+         
           FINAL_COUNT=$(wc -l < subdomains.txt)
           FILTERED_COUNT=$((RAW_COUNT - FINAL_COUNT))
 
