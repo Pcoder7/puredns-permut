@@ -166,7 +166,21 @@ jobs:
               
           RAW_COUNT=$(wc -l < raw_permutations.txt)
           echo "INFO: Starting with $RAW_COUNT raw permutations."
+          # In your terminal, run this exact loop:
+          
+          while read -r pattern; do
+            echo "Testing pattern: [${pattern}]"
+            if ! echo "test" | grep -E "$pattern" > /dev/null 2>&1; then
+              echo "----------------------------------------"
+              echo "CRITICAL ERROR: Invalid regex pattern found!"
+              echo "BAD PATTERN: [${pattern}]"
+              echo "----------------------------------------"
+              exit 1
+            fi
+          done < filter.txt
 
+          echo "SUCCESS: All patterns in filter.txt are valid."
+          
           if [ "$RAW_COUNT" -eq 0 ]; then
               echo "WARNING: No raw permutations were generated. Final subdomains.txt will be empty."
               touch subdomains.txt
