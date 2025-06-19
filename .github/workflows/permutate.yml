@@ -7,7 +7,7 @@ permissions:
 
 env:
   # --- Chunking and Distribution Configuration ---
-  LINES_PER_CHUNK: 30000 # Unchanged from original
+  LINES_PER_CHUNK: 100000 # Unchanged from original
   DISTRIBUTION_THRESHOLD: 21    # NEW: The minimum total chunks to trigger 3-way distribution
   PRIMARY_PERCENTAGE: 45        # NEW: 30% for the primary account
   SECONDARY_PERCENTAGE: 40      # NEW: 30% for the secondary account
@@ -141,17 +141,37 @@ jobs:
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
 
-                #GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
-                
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
-                
+                echo "  -> Running gotator with xargs (8 parallel jobs)..."
+
+                # Define the temporary file to hold all results from the parallel gotator runs
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
-                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
                 
-                wc -l "$GOTATOR_RESULTS_TMP"
-                GOTATOR_COUNT=$(cat "$GOTATOR_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
-                echo "    - Gotator found $GOTATOR_COUNT new unique subdomains"
-                cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
+                # To make the $DYNAMIC_WORDLIST variable available to the sub-shells started by xargs,
+                # we export it. This is the cleanest way to handle variables in xargs with sh -c.
+                export DYNAMIC_WORDLIST
+
+                # The main command:
+                # 1. cat "$TEMP_BASE_LIST": Reads the list of base subdomains for this root domain.
+                # 2. | xargs -P 8 -I {}: Pipes each line to xargs, running 8 jobs in parallel.
+                #    -I {} tells xargs to replace {} with the input line.
+                # 3. sh -c '...': Runs a new shell for each job. This is the most robust way to
+                #    handle complex commands with quotes and variables.
+                # 4. gotator -sub "{}" ...: The command to run. "{}" is the single subdomain from the list.
+                # 5. > "$GOTATOR_RESULTS_TMP": All output from all 8 parallel jobs is collected and
+                #    written to a single temporary results file.
+                cat "$TEMP_BASE_LIST" | xargs -P 8 -I {} \
+                  sh -c 'gotator -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -mindup -silent' > "$GOTATOR_RESULTS_TMP"
+
+                # Now, process the results file just like you do for dnsgen and alterx
+                # This keeps the logic consistent and provides good metrics.
+                if [ -s "$GOTATOR_RESULTS_TMP" ]; then
+                    GOTATOR_COUNT=$(cat "$GOTATOR_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
+                    echo "    - Gotator found $GOTATOR_COUNT new unique subdomains."
+                    # Append the new unique subdomains to the main collection file
+                    cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
+                else
+                    echo "    - Gotator produced no output."
+                fi
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
             # Clean up chrunk's temporary output directories for this root domain
@@ -164,20 +184,44 @@ jobs:
           rm all_permutations_temp.txt
 
           echo "====================================================="
+
           # --- FINAL FILTERING STAGE ---
           echo "FINAL FILTERING: Removing jargon and complex numeric/IP-like patterns..."
-              
+
+          # First, ensure the files we need actually exist
+          if [ ! -s "raw_permutations.txt" ]; then
+            echo "WARNING: raw_permutations.txt is empty or does not exist. No filtering will be done."
+            touch subdomains.txt # Create an empty file to ensure downstream steps don't fail
+            exit 0
+          fi
+          if [ ! -f "filter.txt" ]; then
+            echo "CRITICAL ERROR: filter.txt not found. Cannot apply filters. Aborting."
+            exit 1
+          fi
+
           RAW_COUNT=$(wc -l < raw_permutations.txt)
           echo "INFO: Starting with $RAW_COUNT raw permutations."
-          # In your terminal, run this exact loop:
-          
-          #echo "SUCCESS: All patterns in filter.txt are valid."
-         
-          #FINAL_COUNT=$(wc -l < subdomains.txt)
-          #FILTERED_COUNT=$((RAW_COUNT - FINAL_COUNT))
 
-          #echo "INFO: Filtered out $FILTERED_COUNT subdomains."
-          #echo "FINAL: The cleaned 'subdomains.txt' now contains $FINAL_COUNT permutations."
+          # --- THE FIX: Sanitize and apply the filter file ---
+          echo "INFO: Sanitizing filter.txt to remove empty lines or Windows line endings..."
+          
+          # This creates a clean version of the filter file that grep can safely use.
+          # It removes any empty lines and converts potential \r\n to \n.
+          
+          grep -v '^$' filter.txt | sed 's/\r$//' > sanitized_filters.txt
+
+          echo "INFO: Applying filters from sanitized_filters.txt..."
+
+          grep -ivE -f sanitized_filters.txt raw_permutations.txt > subdomains.txt
+
+          # Clean up the temporary sanitized file
+          rm sanitized_filters.txt
+
+          FINAL_COUNT=$(wc -l < subdomains.txt)
+          FILTERED_COUNT=$((RAW_COUNT - FINAL_COUNT))
+
+          echo "INFO: Filtered out $FILTERED_COUNT subdomains."
+          echo "FINAL: The cleaned 'subdomains.txt' now contains $FINAL_COUNT permutations."
           rm -rf "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-*
           cat raw_permutations.txt | anew -q subdomains.txt
           wc -l subdomains.txt
