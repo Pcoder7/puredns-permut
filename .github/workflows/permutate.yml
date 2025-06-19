@@ -7,10 +7,10 @@ permissions:
 
 env:
   # --- Chunking and Distribution Configuration ---
-  LINES_PER_CHUNK: 200000 # Unchanged from original
+  LINES_PER_CHUNK: 400000 # Unchanged from original
   DISTRIBUTION_THRESHOLD: 21    # NEW: The minimum total chunks to trigger 3-way distribution
-  PRIMARY_PERCENTAGE: 30        # NEW: 30% for the primary account
-  SECONDARY_PERCENTAGE: 30      # NEW: 30% for the secondary account
+  PRIMARY_PERCENTAGE: 45        # NEW: 30% for the primary account
+  SECONDARY_PERCENTAGE: 40      # NEW: 30% for the secondary account
 
   # Define Account 2 repo details here or get from secrets for more flexibility
   # --- Account 2 Details ---
@@ -41,9 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Generate subdomains.txt via chrunk + dnsgen
-        shell: bash
-        run: |
+
       - name: Process, Generate, and Filter Permutations with Dynamic Wordlists
         env:
           MASTER_INPUT_LIST: "all-subdomains.txt" # More flexible way to set the input file
@@ -121,12 +119,55 @@ jobs:
             echo "INFO: Generated dynamic wordlist with $DYNAMIC_WORD_COUNT words."
 
             # Step 3: Run permutation tools efficiently, once per tool per domain
-            echo "  -> Running permutation tools..."
-            gotator -sub "$TEMP_BASE_LIST" -perm "$DYNAMIC_WORDLIST" -depth 1 -adv -md -mindup -silent >> all_permutations_temp.txt
-            dnsgen -w "$DYNAMIC_WORDLIST" -f "$TEMP_BASE_LIST" >> all_permutations_temp.txt
-            alterx -l "$TEMP_BASE_LIST" -w "$DYNAMIC_WORDLIST" -p alterx_template.txt -silent >> all_permutations_temp.txt
 
+
+                # Stage 3a: Gotator (Baseline for this root domain)
+                echo "  -> Running gotator with dynamic wordlist..."
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd 'gotator -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -md -mindup -silent > "{}-gotator.txt"'
+                
+                # Create a temporary file for this domain's gotator results
+                GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
+                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
+                
+                # Add gotator's results to the main raw_permutations file
+                cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
+                GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
+                echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
+
+                # Stage 3b: Dnsgen (Analyze against current raw_permutations)
+                echo "  -> Running dnsgen with dynamic wordlist..."
+                # NOTE: Corrected dnsgen command to use '-d {}' for single domain input with chrunk
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-dnsgen" -cmd 'dnsgen -w "$DYNAMIC_WORDLIST" "{}" > "{}-dnsgen.txt"'
+                
+                DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
+                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
+                
+                # Analyze dnsgen's unique contribution
+                DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
+                echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
+
+                # Add dnsgen's results to the main raw_permutations file
+                cat "$DNSGEN_RESULTS_TMP" | anew -q raw_permutations.txt
+                
+                # Stage 3c: Alterx (Analyze against current raw_permutations)
+                echo "  -> Running alterx with dynamic wordlist..."
+                echo '{{sub}}.{{word}}' > alterx_template.txt; echo '{{sub}}-{{word}}' >> alterx_template.txt
+                # NOTE: Corrected alterx command to pipe the domain from echo
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd 'echo "{}" | alterx -enrich -p alterx_template.txt -pp 'word="$DYNAMIC_WORDLIST"' > "{}-alterx.txt"'
+                
+                ALTERX_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-alterx-results.txt"
+                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-alterx-*.txt 2>/dev/null > "$ALTERX_RESULTS_TMP"
+                
+                # Analyze alterx's unique contribution
+                ALTERX_UNIQUE_ADDITIONS=$(cat "$ALTERX_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
+                echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
+
+                # Add alterx's results to the main raw_permutations file
+                cat "$ALTERX_RESULTS_TMP" | anew -q raw_permutations.txt
+            
             echo "INFO: Finished processing for $ROOT_DOMAIN."
+            # Clean up chrunk's temporary output directories for this root domain
+            rm -rf "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-*
           done < unique_root_domains.txt
 
           # Now, de-duplicate all results at once
@@ -137,11 +178,7 @@ jobs:
           echo "====================================================="
           # --- FINAL FILTERING STAGE ---
           echo "FINAL FILTERING: Removing jargon and complex numeric/IP-like patterns..."
-
-          # The jargon filter definition is excellent, no changes needed
-          cat  jargon_filter.txt
-
-
+              
           RAW_COUNT=$(wc -l < raw_permutations.txt)
           echo "INFO: Starting with $RAW_COUNT raw permutations."
 
@@ -149,7 +186,7 @@ jobs:
               echo "WARNING: No raw permutations were generated. Final subdomains.txt will be empty."
               touch subdomains.txt
           else
-              grep -ivE -f jargon_filter.txt raw_permutations.txt > subdomains.txt
+              grep -ivE -f filter.txt raw_permutations.txt > subdomains.txt
           fi
 
           FINAL_COUNT=$(wc -l < subdomains.txt)
