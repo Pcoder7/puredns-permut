@@ -114,14 +114,14 @@ jobs:
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
                 #GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
                 
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
+                #chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
                 
-                GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
-                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
-                cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
-                wc -l "$GOTATOR_RESULTS_TMP"
-                GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
-                echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
+                #GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
+                #cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
+                #cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
+                #wc -l "$GOTATOR_RESULTS_TMP"
+                #GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
+                #echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
 
                 # Stage 3b: Dnsgen
                 echo "  -> Running dnsgen with dynamic wordlist..."
@@ -131,8 +131,8 @@ jobs:
                 
                 DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
-                DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
-                echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
+                #DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
+                #echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
                 cat "$DNSGEN_RESULTS_TMP" | anew -q raw_permutations.txt
                 
                 # Stage 3c: Alterx
