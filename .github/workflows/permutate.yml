@@ -81,9 +81,7 @@ jobs:
           fi
           echo "-----------------------------------------------------"
 
-          # Create alterx template ONCE, before the loop
-          echo '{{sub}}.{{word}}' > alterx_template.txt
-          echo '{{sub}}-{{word}}' >> alterx_template.txt
+
 
           # This file will hold all generated permutations before unique filtering
           > all_permutations_temp.txt
@@ -151,9 +149,9 @@ jobs:
                 
                 # Stage 3c: Alterx (Analyze against current raw_permutations)
                 echo "  -> Running alterx with dynamic wordlist..."
-                echo '{{sub}}.{{word}}' > alterx_template.txt; echo '{{sub}}-{{word}}' >> alterx_template.txt
+                
                 # NOTE: Corrected alterx command to pipe the domain from echo
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd 'echo "{}" | alterx -enrich -p alterx_template.txt -pp 'word="$DYNAMIC_WORDLIST"' > "{}-alterx.txt"'
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd 'echo "{}" | alterx -enrich -p template.txt -pp 'word="$DYNAMIC_WORDLIST"' > "{}-alterx.txt"'
                 
                 ALTERX_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-alterx-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-alterx-*.txt 2>/dev/null > "$ALTERX_RESULTS_TMP"
