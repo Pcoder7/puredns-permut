@@ -170,13 +170,14 @@ jobs:
           
           while read -r pattern; do
             echo "Testing pattern: [${pattern}]"
-            if ! echo "test" | grep -E "$pattern" > /dev/null 2>&1; then
+            true | grep -E "$pattern" > /dev/null 2>&1 || {
               echo "----------------------------------------"
               echo "CRITICAL ERROR: Invalid regex pattern found!"
+              echo "This is the line that failed syntax validation:"
               echo "BAD PATTERN: [${pattern}]"
               echo "----------------------------------------"
               exit 1
-            fi
+            } 
           done < filter.txt
 
           echo "SUCCESS: All patterns in filter.txt are valid."
