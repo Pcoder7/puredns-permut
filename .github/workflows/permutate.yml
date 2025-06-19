@@ -107,49 +107,46 @@ jobs:
 
             # Step 3: Run permutation tools efficiently, once per tool per domain
 
-
                 # Stage 3a: Gotator (Baseline for this root domain)
                 echo "  -> Running gotator with dynamic wordlist..."
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd 'gotator -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -md -mindup -silent > "{}-gotator.txt"'
+                # THE FIX: Build the command string first to handle quotes correctly.
+                # We use 'printf' with '%q' to safely quote the wordlist path.
+                SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
+                GOTATOR_CMD="gotator -sub {} -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -md -mindup -silent > {}-gotator.txt"
+
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
                 
-                # Create a temporary file for this domain's gotator results
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
-                
-                # Add gotator's results to the main raw_permutations file
                 cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
                 GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
                 echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
 
-                # Stage 3b: Dnsgen (Analyze against current raw_permutations)
+                # Stage 3b: Dnsgen
                 echo "  -> Running dnsgen with dynamic wordlist..."
-                # NOTE: Corrected dnsgen command to use '-d {}' for single domain input with chrunk
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-dnsgen" -cmd 'dnsgen -w "$DYNAMIC_WORDLIST" "{}" > "{}-dnsgen.txt"'
+                DNSGEN_CMD="dnsgen -w $SAFELY_QUOTED_WORDLIST {} > {}-dnsgen.txt"
+
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-dnsgen" -cmd "$DNSGEN_CMD"
                 
                 DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
-                
-                # Analyze dnsgen's unique contribution
                 DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
                 echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
-
-                # Add dnsgen's results to the main raw_permutations file
                 cat "$DNSGEN_RESULTS_TMP" | anew -q raw_permutations.txt
                 
-                # Stage 3c: Alterx (Analyze against current raw_permutations)
+                # Stage 3c: Alterx
                 echo "  -> Running alterx with dynamic wordlist..."
+               
+                # 'printf' also works for the alterx template path
+                SAFELY_QUOTED_TEMPLATE=$(printf '%q' "template.txt")
+                ALTERX_CMD="echo {} | alterx -enrich -p $SAFELY_QUOTED_TEMPLATE -pp 'word=$SAFELY_QUOTED_WORDLIST' > {}-alterx.txt"
                 
-                # NOTE: Corrected alterx command to pipe the domain from echo
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd 'echo "{}" | alterx -enrich -p template.txt -pp 'word="$DYNAMIC_WORDLIST"' > "{}-alterx.txt"'
-                
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd "$ALTERX_CMD"
+
                 ALTERX_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-alterx-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-alterx-*.txt 2>/dev/null > "$ALTERX_RESULTS_TMP"
-                
-                # Analyze alterx's unique contribution
                 ALTERX_UNIQUE_ADDITIONS=$(cat "$ALTERX_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
-
-                # Add alterx's results to the main raw_permutations file
                 cat "$ALTERX_RESULTS_TMP" | anew -q raw_permutations.txt
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
