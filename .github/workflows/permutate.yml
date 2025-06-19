@@ -118,7 +118,7 @@ jobs:
                 
                 #GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 #cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
-                #cat "$GOTATOR_RESULTS_TMP" | anew -q raw_permutations.txt
+                #cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
                 #wc -l "$GOTATOR_RESULTS_TMP"
                 #GOTATOR_COUNT=$(wc -l < "$GOTATOR_RESULTS_TMP")
                 #echo "    - Gotator generated $GOTATOR_COUNT initial permutations for $ROOT_DOMAIN."
@@ -131,9 +131,9 @@ jobs:
                 
                 DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
-                #DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
+                #DNSGEN_UNIQUE_ADDITIONS=$(cat "$DNSGEN_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
                 #echo "    - Dnsgen found $DNSGEN_UNIQUE_ADDITIONS new unique subdomains."
-                cat "$DNSGEN_RESULTS_TMP" | anew -q raw_permutations.txt
+                cat "$DNSGEN_RESULTS_TMP" | anew -q all_permutations_temp.txt
                 
                 # Stage 3c: Alterx
                 echo "  -> Running alterx with dynamic wordlist..."
@@ -146,9 +146,9 @@ jobs:
 
                 ALTERX_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-alterx-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-alterx-*.txt 2>/dev/null > "$ALTERX_RESULTS_TMP"
-                ALTERX_UNIQUE_ADDITIONS=$(cat "$ALTERX_RESULTS_TMP" | anew -d raw_permutations.txt | wc -l)
+                ALTERX_UNIQUE_ADDITIONS=$(cat "$ALTERX_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
-                cat "$ALTERX_RESULTS_TMP" | anew -q raw_permutations.txt
+                cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
             # Clean up chrunk's temporary output directories for this root domain
@@ -157,7 +157,7 @@ jobs:
 
           # Now, de-duplicate all results at once
           echo "INFO: De-duplicating all generated permutations..."
-          cat all_permutations_temp.txt | anew -q > raw_permutations.txt
+          cat all_permutations_temp.txt | anew -q raw_permutations.txt
           rm all_permutations_temp.txt
 
           echo "====================================================="
