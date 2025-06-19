@@ -112,9 +112,9 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                GOTATOR_CMD="gotator -sub \"{}\" -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -md -mindup -silent > \"{}\"-gotator.txt"
+                GOTATOR_CMD="gotator -sub \"{}\" -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -md -silent > \"{}-gotator.txt\""
 
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd '$GOTATOR_CMD'
                 
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
@@ -126,7 +126,7 @@ jobs:
                 echo "  -> Running dnsgen with dynamic wordlist..."
                 DNSGEN_CMD="dnsgen -w $SAFELY_QUOTED_WORDLIST {} > {}-dnsgen.txt"
 
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-dnsgen" -cmd "$DNSGEN_CMD"
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-dnsgen" -cmd '$DNSGEN_CMD'
                 
                 DNSGEN_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-dnsgen-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-dnsgen-*.txt 2>/dev/null > "$DNSGEN_RESULTS_TMP"
@@ -139,9 +139,9 @@ jobs:
                
                 # 'printf' also works for the alterx template path
                 SAFELY_QUOTED_TEMPLATE=$(printf '%q' "template.txt")
-                ALTERX_CMD="echo \"{}\" | alterx -enrich -p $SAFELY_QUOTED_TEMPLATE -pp 'word=$SAFELY_QUOTED_WORDLIST' > \"{}\"-alterx.txt"
+                ALTERX_CMD="alterx -l \"{}\" -enrich -p $SAFELY_QUOTED_TEMPLATE -pp \"word=$SAFELY_QUOTED_WORDLIST\" > \"{}-alterx.txt\""
                 
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd "$ALTERX_CMD"
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd '$ALTERX_CMD'
 
                 ALTERX_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-alterx-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-alterx-*.txt 2>/dev/null > "$ALTERX_RESULTS_TMP"
