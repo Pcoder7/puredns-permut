@@ -54,7 +54,7 @@ jobs:
           echo "INFO: Verifying input file..."
           [ -f "$MASTER_INPUT_LIST" ] || { echo "CRITICAL: Missing input file '$MASTER_INPUT_LIST'."; exit 1; }
 
-          gotator --help
+          gotator-solved --help
 
           echo "-----------------------------------------------------"
 
