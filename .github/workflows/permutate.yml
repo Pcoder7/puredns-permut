@@ -107,14 +107,14 @@ jobs:
 
             # Step 3: Run permutation tools efficiently, once per tool per domain
 
-                # Stage 3a: Gotator (Baseline for this root domain)
+                
                 echo "  -> Running gotator with dynamic wordlist..."
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
 
 
-                # Stage 3b: Dnsgen
+                # Stage 3a: Dnsgen
                 echo "  -> Running dnsgen with dynamic wordlist..."
                 DNSGEN_CMD="dnsgen -w $SAFELY_QUOTED_WORDLIST {} > {}-dnsgen.txt"
 
@@ -126,7 +126,7 @@ jobs:
                 echo "    - Dnsgen generated $DNSGEN_UNIQUE_ADDITIONS found new unique subdomains."
                 cat "$DNSGEN_RESULTS_TMP" | anew -q all_permutations_temp.txt
                 
-                # Stage 3c: Alterx
+                # Stage 3b: Alterx
                 echo "  -> Running alterx with dynamic wordlist..."
                
                 # 'printf' also works for the alterx template path
@@ -141,43 +141,22 @@ jobs:
                 echo "    - Alterx found $ALTERX_UNIQUE_ADDITIONS new unique subdomains."
                 cat "$ALTERX_RESULTS_TMP" | anew -q all_permutations_temp.txt
 
-                echo "  -> Running gotator with xargs (8 parallel jobs)..."
-                gotator --help
-                echo "Location of gotator:"
-                which gotator
-                find / -type f -name gotator 2>/dev/null || echo "gotator not found by find"
-                echo ""
-                GOTATOR_PATH=$(command -v gotator)
-                echo "    - Found gotator at: $GOTATOR_PATH"
-
-                # Define the temporary file for the results
-                GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
+                # Stage 3b: Alterx
                 
-                # STEP 2: Export the variables that the sub-shells will need.
-                # This includes our new path variable and the wordlist path.
-                export DYNAMIC_WORDLIST
-                export GOTATOR_PATH
-
-                # The main command:
-                # 1. cat "$TEMP_BASE_LIST": Reads the list of base subdomains for this root domain.
-                # 2. | xargs -P 8 -I {}: Pipes each line to xargs, running 8 jobs in parallel.
-                #    -I {} tells xargs to replace {} with the input line.
-                # 3. sh -c '...': Runs a new shell for each job. This is the most robust way to
-                #    handle complex commands with quotes and variables.
-
-                cat "$TEMP_BASE_LIST" | xargs -P 8 -I {} \
-                  sh -c '"$GOTATOR_PATH" -sub "{}" -depth 1 -perm "$DYNAMIC_WORDLIST" -adv -mindup -silent' > "$GOTATOR_RESULTS_TMP"
-
-                # Now, process the results file just like you do for dnsgen and alterx
-                # This keeps the logic consistent and provides good metrics.
-                if [ -s "$GOTATOR_RESULTS_TMP" ]; then
-                    GOTATOR_COUNT=$(cat "$GOTATOR_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
-                    echo "    - Gotator found $GOTATOR_COUNT new unique subdomains."
-                    # Append the new unique subdomains to the main collection file
-                    cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
-                else
-                    echo "    - Gotator produced no output."
-                fi
+                #GOTATOR_CMD="gotator-solved -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
+                
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator-solved -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
+                
+                GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
+                cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
+                
+                wc -l "$GOTATOR_RESULTS_TMP"
+                GOTATOR_COUNT=$(cat "$GOTATOR_RESULTS_TMP" | anew -d all_permutations_temp.txt | wc -l)
+                echo "    - Gotator found $GOTATOR_COUNT new unique subdomains"
+                cat "$GOTATOR_RESULTS_TMP" | anew -q all_permutations_temp.txt
+              
+            
+            echo "INFO: Finished processing for $ROOT_DOMAIN."
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
             # Clean up chrunk's temporary output directories for this root domain
