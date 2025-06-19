@@ -112,9 +112,9 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
+                #GOTATOR_CMD="gotator -sub {} -depth 1 -adv -perm '"$DYNAMIC_WORDLIST"' -mindup -silent | anew -q {}-gotator.txt"
                 
-                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
+                chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -cmd 'gotator -sub "{}" -depth 1 -perm '"$DYNAMIC_WORDLIST"' -adv -mindup -silent | anew -q "{}-gotator.txt"' -prefix "${ROOT_DOMAIN}-gotator"
                 
                 GOTATOR_RESULTS_TMP="${TMPDIR}/${ROOT_DOMAIN}-gotator-results.txt"
                 cat "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-gotator-*.txt 2>/dev/null > "$GOTATOR_RESULTS_TMP"
@@ -152,7 +152,7 @@ jobs:
             
             echo "INFO: Finished processing for $ROOT_DOMAIN."
             # Clean up chrunk's temporary output directories for this root domain
-            rm -rf "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-*
+            
           done < unique_root_domains.txt
 
           # Now, de-duplicate all results at once
@@ -179,6 +179,7 @@ jobs:
 
           echo "INFO: Filtered out $FILTERED_COUNT subdomains."
           echo "FINAL: The cleaned 'subdomains.txt' now contains $FINAL_COUNT permutations."
+          rm -rf "$TMPDIR"/chrunk-data/${ROOT_DOMAIN}-*
           wc -l subdomains.txt
           
       - name: DEBUG - Verify Tools and Initial File System State
