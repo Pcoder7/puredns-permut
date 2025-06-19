@@ -1,4 +1,3 @@
-
 ^cpanel\.
 ^webmail\.
 ^webdisk\.
