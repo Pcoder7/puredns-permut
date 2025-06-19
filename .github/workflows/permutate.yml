@@ -112,7 +112,7 @@ jobs:
                 # THE FIX: Build the command string first to handle quotes correctly.
                 # We use 'printf' with '%q' to safely quote the wordlist path.
                 SAFELY_QUOTED_WORDLIST=$(printf '%q' "$DYNAMIC_WORDLIST")
-                GOTATOR_CMD="gotator -sub {} -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -md -mindup -silent > {}-gotator.txt"
+                GOTATOR_CMD="gotator -sub \"{}\" -depth 1 -perm $SAFELY_QUOTED_WORDLIST -adv -md -mindup -silent > \"{}\"-gotator.txt"
 
                 chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-gotator" -cmd "$GOTATOR_CMD"
                 
@@ -139,7 +139,7 @@ jobs:
                
                 # 'printf' also works for the alterx template path
                 SAFELY_QUOTED_TEMPLATE=$(printf '%q' "template.txt")
-                ALTERX_CMD="echo {} | alterx -enrich -p $SAFELY_QUOTED_TEMPLATE -pp 'word=$SAFELY_QUOTED_WORDLIST' > {}-alterx.txt"
+                ALTERX_CMD="echo \"{}\" | alterx -enrich -p $SAFELY_QUOTED_TEMPLATE -pp 'word=$SAFELY_QUOTED_WORDLIST' > \"{}\"-alterx.txt"
                 
                 chrunk -p 20 -i "$TEMP_BASE_LIST" -c 20 -prefix "${ROOT_DOMAIN}-alterx" -cmd "$ALTERX_CMD"
 
