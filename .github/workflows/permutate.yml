@@ -686,7 +686,7 @@ jobs:
               "primary_repo_name": $repo_name,
               "primary_run_id": $run_id,
               "chunk_package_artifact_name": $artifact_name,
-              "secondary_matrix_json": $matrix_as_a_string 
+              "tertiary_matrix_json": $matrix_as_a_string 
             }')
           
           echo "Constructed JSON Payload: $JSON_PAYLOAD"
