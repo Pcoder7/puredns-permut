@@ -178,7 +178,7 @@ jobs:
             DYNAMIC_WORDLIST="${TMPDIR}/${ROOT_DOMAIN}-wordlist.txt"
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
-            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 50| awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' --color=never || true | anew -q "$DYNAMIC_WORDLIST"
+            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 50| awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' --color=never | anew -q "$DYNAMIC_WORDLIST" || true
             
             #dsieve -if "$TEMP_BASE_LIST" -f 4 -top 500 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
             #dsieve -if "$TEMP_BASE_LIST" -f 5 -top 200 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
@@ -278,7 +278,7 @@ jobs:
           # This creates a clean version of the filter file that grep can safely use.
           # It removes any empty lines and converts potential \r\n to \n.
           
-          grep -v '^$' filter.txt --color=never || true | sed 's/\r$//' > sanitized_filters.txt 
+          grep -v '^$' filter.txt --color=never  | sed 's/\r$//' > sanitized_filters.txt || true
 
           echo "INFO: Applying filters from sanitized_filters.txt..."
 
@@ -935,11 +935,11 @@ jobs:
             
             # Sort the simple puredns results (This file doesn't exist in the reference, but we keep it for extra data)
             simple_outfile="$OUTPUT_ROOT/$clean_parent/puredns_results.txt"
-            grep -E "(^|\\.)${clean_parent//./\\.}(\$)" "$PUREDNS_FILE" || true | anew -q "$simple_outfile" 
+            grep -E "(^|\\.)${clean_parent//./\\.}(\$)" "$PUREDNS_FILE"  | anew -q "$simple_outfile" || true
             
             # Sort the enriched subdomain:port results
             ports_outfile="$OUTPUT_ROOT/$clean_parent/subdomain_ports.txt"
-            grep -E "(^|\\.)${clean_parent//./\\.}(\:|\$)" "$OUTPUT" --color=never || true | anew -q "$ports_outfile" 
+            grep -E "(^|\\.)${clean_parent//./\\.}(\:|\$)" "$OUTPUT" --color=never | anew -q "$ports_outfile" || true
           done < "$PARENT_DOMAINS_SCOPE"
 
           # ====================================================================
