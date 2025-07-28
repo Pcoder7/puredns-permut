@@ -801,7 +801,7 @@ jobs:
           
           echo "$HOME/go/bin" >> $GITHUB_PATH
           
-      - name: Resolve, Enrich, and Filter Chunk      
+  
       - name: Fetch wordlists
         shell: bash
         run: |
