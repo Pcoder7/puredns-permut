@@ -1055,7 +1055,7 @@ jobs:
       - name: Organize and Push to store-recon
         shell: bash
         env:
-          STORE_RECON_PAT: ${{ secrets.PAT_FOR_SECONDARY }}
+          STORE_RECON_PAT: ${{ secrets.PAT_FOR_SECONDRY }}
           ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
           STORE: ${{secrets.STORE}}
         run: |
