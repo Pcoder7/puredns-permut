@@ -903,7 +903,7 @@ jobs:
           cat "$TMP_SMAP_NONCDN" "$TMP_CDN" | sort -u > "$SMAP_FILE"
           
           echo "-> Showing you SMAP_FILE---------"
-          head -n50 "$SMAP_FILE"
+          cat "$SMAP_FILE"
           
           echo "-> Joining IPs/Ports to create '$OUTPUT'..."
           awk -F: '
@@ -926,7 +926,7 @@ jobs:
             > "$OUTPUT"
           echo "  -> Generated enriched list with $(wc -l < "$OUTPUT") entries."
 
-          head -n50 "$OUTPUT"
+          cat "$OUTPUT"
 
           # ====================================================================
           # STAGE 4: SORT FINAL RESULTS INTO ROOT DOMAIN FOLDERS
