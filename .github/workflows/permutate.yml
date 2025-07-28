@@ -898,9 +898,13 @@ jobs:
           echo "-> Scanning non-CDN IPs for ports 80, 443..."
           rustscan -a "$TMP_NONCDN" -p 70,80,81,82,83,84,85,88,443,888,1234,1311,2002,3000,3128,4443,5000,5222,5269,5800,7070,8000,8001,8002,8003,8004,8006,8008,8009,8010,8080,8081,8082,8083,8084,8085,8088,8181,8443,8880,8887,8888,9000,9001,9080,9090,9999,10000,10001,50000 --no-banner -t 1000 --tries 1 -u 20000 --scan-order "Random" -b 100 --greppable --accessible > "$TMP_RUSTSCAN" || true
           cat "$TMP_RUSTSCAN" | awk -F ' -> ' '{ gsub(/[\[\]]/, "", $2); n = split($2, p, ","); for(i=1;i<=n;i++) print $1 ":" p[i] }' | anew -q "$TMP_SMAP_NONCDN"
-
+          cat "$TMP_RUSTSCAN" | awk -F ' -> ' '{ gsub(/[\[\]]/, "", $2); n = split($2, p, ","); for(i=1;i<=n;i++) print $1 ":" p[i] }'
+          
           cat "$TMP_SMAP_NONCDN" "$TMP_CDN" | sort -u > "$SMAP_FILE"
-
+          
+          echo "-> Showing you SMAP_FILE---------"
+          head -n50 "$SMAP_FILE"
+          
           echo "-> Joining IPs/Ports to create '$OUTPUT'..."
           awk -F: '
             NF==2 { print $1, $2 }
@@ -921,6 +925,8 @@ jobs:
             } \
             > "$OUTPUT"
           echo "  -> Generated enriched list with $(wc -l < "$OUTPUT") entries."
+
+          head -n50 "$OUTPUT"
 
           # ====================================================================
           # STAGE 4: SORT FINAL RESULTS INTO ROOT DOMAIN FOLDERS
