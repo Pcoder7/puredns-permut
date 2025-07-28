@@ -757,7 +757,50 @@ jobs:
             echo "Installing dsieve..."
             go install github.com/trickest/dsieve@latest
           fi
-      
+     
+      - name: Install Tools
+        run: |
+          # Installing smap
+          if ! command -v smap >/dev/null; then
+            echo "Installing smap…"
+            go install -v github.com/s0md3v/smap/cmd/smap@latest
+          else
+            echo "smap already in cache"
+          fi    
+          # Installing inscope
+          if ! command -v inscope >/dev/null; then
+            echo "Installing inscope…"
+            go install -v github.com/tomnomnom/hacks/inscope@latest
+          else
+            echo "inscope already in cache"
+          fi    
+          
+          if ! command -v anew >/dev/null; then
+            echo "Installing anew…"
+            go install -v github.com/tomnomnom/anew@latest
+          else
+            echo "anew already in cache"
+          fi
+          
+          if ! command -v cut-cdn >/dev/null; then
+            echo "Installing cut-cdn…"
+            go install github.com/ImAyrix/cut-cdn@latest
+          else
+            echo "cut-cdn already in cache"
+          fi     
+
+          if ! command -v naabu >/dev/null; then
+            echo "Installing naabu…"
+            go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+          else
+            echo "naabu already in cache"
+          fi
+
+          pip3 install --no-cache-dir ipaddress
+          
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+          
+      - name: Resolve, Enrich, and Filter Chunk      
       - name: Fetch wordlists
         shell: bash
         run: |
@@ -771,6 +814,7 @@ jobs:
               https://raw.githubusercontent.com/and0x00/resolvers.txt/refs/heads/main/resolvers.txt
               echo "resolvers-trusted.txt is downloaded"
           fi          
+     
       - name: Run puredns + pre-dsieve on subdomains + final filtering
         shell: bash
         run: |
