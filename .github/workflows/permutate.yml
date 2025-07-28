@@ -1057,6 +1057,7 @@ jobs:
         env:
           STORE_RECON_PAT: ${{ secrets.PAT_FOR_SECONDARY_ACCOUNT_REPO }}
           ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
+          STORE: ${{secretes.STORE}}
         run: |
           set -e
           RESULTS_DIR="${GITHUB_WORKSPACE}/final_results"
