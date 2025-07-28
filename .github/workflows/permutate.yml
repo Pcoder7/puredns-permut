@@ -968,6 +968,70 @@ jobs:
           retention-days: 1
 
   # ====================================================================
+  # JOB 4: Merge All Results (Identical to reference workflow)
+  # ====================================================================
+  merge_results:
+    name: Merge All Distributed Results
+    runs-on: ubuntu-latest
+    needs: resolve_primary_account_chunks
+    if: always()
+    outputs:
+      has_results: ${{ steps.consolidate.outputs.has_results }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Download all result artifacts from all accounts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'recon-results-*'
+          path: temp-aggregated-results
+          merge-multiple: true
+      - name: Consolidate all results into root domain folders
+        id: consolidate
+        shell: bash
+        run: |
+          set -e
+          mkdir -p final_results
+          if [ ! -d "temp-aggregated-results" ] || [ -z "$(ls -A temp-aggregated-results)" ]; then
+            echo "::warning:: No result artifacts were found. Nothing to merge."
+            echo "has_results=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "INFO: Aggregating all downloaded results..."
+          for filepath in $(find temp-aggregated-results -type f -name "puredns_results.txt"); do
+            parent_domain=$(basename "$(dirname "$filepath")")
+            dest_file="final_results/$parent_domain/puredns_results.txt"
+            mkdir -p "final_results/$parent_domain"
+            cat "$filepath" >> "$dest_file"
+          done
+          echo "INFO: Aggregating subdomain port data..."
+          for filepath in $(find temp-aggregated-results -type f -name "subdomain_ports.txt"); do
+            parent_domain=$(basename "$(dirname "$filepath")")
+            dest_file="final_results/$parent_domain/subdomain_ports.txt"
+            mkdir -p "final_results/$parent_domain"
+            cat "$filepath" >> "$dest_file"
+          done
+          echo "INFO: De-duplicating all aggregated files..."
+          for final_file in $(find final_results -type f -name "*.txt"); do
+              sort -u -o "$final_file" "$final_file"
+          done
+          if [ -z "$(ls -A final_results)" ]; then
+            echo "::warning:: Result artifacts contained no valid data to merge."
+            echo "has_results=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "has_results=true" >> $GITHUB_OUTPUT
+          echo "✅ Successfully consolidated results from all accounts."
+          ls -R final_results
+      - name: Upload Final Consolidated Artifact
+        if: steps.consolidate.outputs.has_results == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-recon-results
+          path: final_results/
+          retention-days: 1
+
+  # ====================================================================
   # JOB 5: Commit All Results (NEW - Identical to reference workflow)
   # ====================================================================
   commit_all_results:
