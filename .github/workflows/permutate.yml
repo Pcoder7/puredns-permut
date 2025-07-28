@@ -84,7 +84,7 @@ jobs:
             
             # Create a temporary file containing only subdomains for the current root domain
             TEMP_ROOT_LIST="${TMPDIR}/${ROOT_DOMAIN}-list.txt"
-            grep -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" all-resolved-subdomains.txt > "$TEMP_ROOT_LIST"
+            grep -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" all-resolved-subdomains.txt --color=never > "$TEMP_ROOT_LIST" || true
 
             if [ ! -s "$TEMP_ROOT_LIST" ]; then continue; fi
 
@@ -167,7 +167,7 @@ jobs:
             # Step 1: Create a temporary base list for the current root domain
             TEMP_BASE_LIST="${TMPDIR}/${ROOT_DOMAIN}-base.txt"
             echo "INFO: Creating temporary base list for '$ROOT_DOMAIN'..."
-            grep -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" "$MASTER_INPUT_LIST" > "$TEMP_BASE_LIST"
+            grep -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" "$MASTER_INPUT_LIST" --color=never > "$TEMP_BASE_LIST" || true
 
             if [ ! -s "$TEMP_BASE_LIST" ]; then
                 echo "WARNING: No subdomains found for '$ROOT_DOMAIN' in the master list. Skipping."
@@ -178,7 +178,8 @@ jobs:
             DYNAMIC_WORDLIST="${TMPDIR}/${ROOT_DOMAIN}-wordlist.txt"
             echo "INFO: Generating dynamic wordlist for '$ROOT_DOMAIN'..."
             # This pipeline is efficient and correct
-            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 1000 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
+            dsieve -if "$TEMP_BASE_LIST" -f 3 -top 50| awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' --color=never| anew -q "$DYNAMIC_WORDLIST"
+            
             #dsieve -if "$TEMP_BASE_LIST" -f 4 -top 500 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
             #dsieve -if "$TEMP_BASE_LIST" -f 5 -top 200 | awk -F '[-.]' '{for(i=1;i<=NF;i++) print $i}' | sort -u | grep -vE '^[0-9]+$|^.$' | anew -q "$DYNAMIC_WORDLIST"
             
@@ -277,11 +278,11 @@ jobs:
           # This creates a clean version of the filter file that grep can safely use.
           # It removes any empty lines and converts potential \r\n to \n.
           
-          grep -v '^$' filter.txt | sed 's/\r$//' > sanitized_filters.txt
+          grep -v '^$' filter.txt --color=never| sed 's/\r$//' > sanitized_filters.txt || true
 
           echo "INFO: Applying filters from sanitized_filters.txt..."
 
-          grep -ivE -f sanitized_filters.txt raw_permutations.txt > subdomains.txt
+          grep -ivE -f sanitized_filters.txt raw_permutations.txt > subdomains.txt || true
 
           # Clean up the temporary sanitized file
           rm sanitized_filters.txt
