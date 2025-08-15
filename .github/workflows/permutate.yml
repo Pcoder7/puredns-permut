@@ -1113,6 +1113,6 @@ jobs:
           fi
           echo "Committing and pushing changes to ${{ env.STORE }}..."
           git add results/
-          git commit -m "feat: Add new assets from distributed permutation scan (Run ID ${{ github.run_id }})"
+          git commit -m "feat: Add new assets from distributed permutation scan with Correlation ID: ${{ github.run_id }})"
           git push -v origin main
           echo "✅ Successfully pushed new consolidated results to ${{ env.STORE }}."
