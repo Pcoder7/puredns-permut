@@ -95,7 +95,7 @@ jobs:
             # --- Your Idea, Part 1: Random Sample of the Top-Tier ---
             echo "  -> Getting a random 1000 sample from the top 2000 most common subdomains..."
             # We use -top-subdomains to get the full subdomains, then shuffle and take a sample.
-            dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf | head -n 1000 | anew -q "$TEMP_SEED_LIST_DOMAIN"
+            dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf | head -n 1000 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
             
             # --- Your Idea, Part 2: Random Sample of the Mid-Tier ---
             echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
