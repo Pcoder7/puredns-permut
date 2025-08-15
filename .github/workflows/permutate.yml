@@ -100,7 +100,7 @@ jobs:
             # --- Your Idea, Part 2: Random Sample of the Mid-Tier ---
             echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
             # This is your clever tail trick, translated to full subdomains.
-            dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf | head -n 500 | anew -q "$TEMP_SEED_LIST_DOMAIN"
+            dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf | head -n 500 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
 
             # --- Finalize for this domain ---
             # Append the unique seeds for this domain to the master list
