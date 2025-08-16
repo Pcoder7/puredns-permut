@@ -25,6 +25,11 @@ jobs:
   prepare_all_chunks_and_package:
     name: Prepare All Chunks & Package
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
     outputs:
       # Output 1: The full JSON matrix string of ALL generated chunks
       all_chunks_matrix_json: ${{ steps.build_full_matrix.outputs.full_matrix }}
