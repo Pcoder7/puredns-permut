@@ -128,7 +128,7 @@ jobs:
             
             echo "  -> Pre-calculating top 5000 subdomains to optimize performance..."
             TEMP_TOP_5000_LIST="${TMPDIR}/${ROOT_DOMAIN}-top5000.txt"
-            dsieve -if "$TEMP_ROOT_LIST" -top 5000 > "$TEMP_TOP_5000_LIST"
+            dsieve -if "$TEMP_ROOT_LIST" -f 3 -top 5000 > "$TEMP_TOP_5000_LIST"
             
             TEMP_SEED_LIST_DOMAIN="${TMPDIR}/${ROOT_DOMAIN}-seeds.txt"
             > "$TEMP_SEED_LIST_DOMAIN"
