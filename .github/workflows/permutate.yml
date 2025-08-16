@@ -25,7 +25,11 @@ jobs:
   prepare_all_chunks_and_package:
     name: Prepare All Chunks & Package
     runs-on: ubuntu-latest
-
+    container:
+      image: ghcr.io/pcoder7/spider-puredns-actions:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
     outputs:
       # Output 1: The full JSON matrix string of ALL generated chunks
       all_chunks_matrix_json: ${{ steps.build_full_matrix.outputs.full_matrix }}
@@ -96,12 +100,14 @@ jobs:
             
             TEMP_SEED_LIST_DOMAIN="${TMPDIR}/${ROOT_DOMAIN}-seeds.txt"
             > "$TEMP_SEED_LIST_DOMAIN"
+
+            wc -l "$TEMP_SEED_LIST_DOMAIN" 
             
             echo "  -> Getting a random 1000 sample from the top 2000 most common subdomains..."
-            dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf -n 1000 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
+            dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf | head -n1000 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
             
             echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
-            dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf -n 500 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
+            dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf | head -n 500 anew -q "$TEMP_SEED_LIST_DOMAIN" || true
 
             SEED_COUNT=$(wc -l < "$TEMP_SEED_LIST_DOMAIN")
             echo "  -> Generated $SEED_COUNT potential seeds for $ROOT_DOMAIN."
