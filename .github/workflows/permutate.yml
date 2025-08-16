@@ -25,11 +25,7 @@ jobs:
   prepare_all_chunks_and_package:
     name: Prepare All Chunks & Package
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/pcoder7/spider-puredns-actions:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_TOKEN }}
+
     outputs:
       # Output 1: The full JSON matrix string of ALL generated chunks
       all_chunks_matrix_json: ${{ steps.build_full_matrix.outputs.full_matrix }}
@@ -68,7 +64,10 @@ jobs:
               echo "WARNING: 'results' directory not found. Exiting."
               exit 0
           fi
-
+          wc -l store-recon-temp/results/af.mil/puredns_result.txt
+          
+          wc -l all-resolved-subdomains.txt
+          
           if [ ! -s all-resolved-subdomains.txt ]; then
               echo "WARNING: Master list 'all-resolved-subdomains.txt' is empty. Exiting."
               exit 0
