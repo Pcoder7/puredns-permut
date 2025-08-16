@@ -25,11 +25,6 @@ jobs:
   prepare_all_chunks_and_package:
     name: Prepare All Chunks & Package
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/pcoder7/spider-puredns-actions:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_TOKEN }}
     outputs:
       # Output 1: The full JSON matrix string of ALL generated chunks
       all_chunks_matrix_json: ${{ steps.build_full_matrix.outputs.full_matrix }}
@@ -62,7 +57,6 @@ jobs:
                
       - name: Install Tools
         run: |
-
           # Installing dsieve 
           if ! command -v dsieve >/dev/null; then
             echo "Installing smap…"
@@ -88,78 +82,94 @@ jobs:
           STORE: ${{ secrets.STORE }}
           ACCOUNT2_USERNAME: ${{ secrets.ACCOUNT2_REPO_OWNER }}
         run: |
-         
-          echo "INFO: Performing a fast, shallow clone of the results repository..."
-          git clone --depth 1 "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" store-recon-temp
+         IFS=$'\n\t'
+         TMPDIR=${TMPDIR:-/tmp}
+         echo "INFO: Performing a fast, shallow clone of the results repository..."
+         git clone --depth 1 "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" store-recon-temp
           
-          echo "INFO: Aggregating and aggressively sanitizing all results into a master list..."
-          if [ -d "store-recon-temp/results" ]; then
-          
-          
-              # This pipeline now strips ALL non-printable characters, not just null bytes.
-              # 's/[^[:graph:][:space:]]//g' removes anything not a graphical character or whitespace.
-              
-              find store-recon-temp/results -type f -name "puredns_result.txt" -exec awk '{print $1}' {} + | sed 's/[^[:graph:][:space:]]//g' > all-resolved-subdomains.txt
-          else
-              echo "WARNING: 'results' directory not found. Exiting."
-              exit 0
-          fi
-          wc -l store-recon-temp/results/af.mil/puredns_result.txt
-          head -n10 store-recon-temp/results/af.mil/puredns_result.txt
-          wc -l all-resolved-subdomains.txt
-          
-          if [ ! -s all-resolved-subdomains.txt ]; then
-              echo "WARNING: Master list 'all-resolved-subdomains.txt' is empty. Exiting."
-              exit 0
-          fi
-
-          echo "INFO: Extracting unique root domains from the master list..."
-          dsieve -if all-resolved-subdomains.txt -f 2 | sort -u > unique_root_domains.txt
-          
-          # This will be our final list used for permutations
-          > final-subdomain-list.txt
-          echo "INFO: Building smart seed list for each root domain..."
-          while read -r ROOT_DOMAIN; do
-            if [ -z "$ROOT_DOMAIN" ]; then continue; fi
-            echo "====================================================="
-            echo "Processing Root Domain: $ROOT_DOMAIN"
-            
-            TEMP_ROOT_LIST="${TMPDIR}/${ROOT_DOMAIN}-list.txt"
-            # --- CHANGE 2: GREP SAFEGUARD ---
-            # The `-a` or `--text` flag forces grep to treat the file as text, preventing the "binary file matches" error here.
-            grep -a -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" all-resolved-subdomains.txt --color=never > "$TEMP_ROOT_LIST" || true
-
-            if [ ! -s "$TEMP_ROOT_LIST" ]; then
-                echo "WARNING: No subdomains found for '$ROOT_DOMAIN' after filtering. Skipping."
-                continue
-            fi
-            
-            TEMP_SEED_LIST_DOMAIN="${TMPDIR}/${ROOT_DOMAIN}-seeds.txt"
-            > "$TEMP_SEED_LIST_DOMAIN"
-
-            wc -l "$TEMP_SEED_LIST_DOMAIN" 
-            
-            echo "  -> Getting a random 1000 sample from the top 2000 most common subdomains..."
-            dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf | head -n1000 | anew -q "$TEMP_SEED_LIST_DOMAIN" || true
-            
-            echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
-            dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf | head -n 500 anew -q "$TEMP_SEED_LIST_DOMAIN" || true
-
-            SEED_COUNT=$(wc -l < "$TEMP_SEED_LIST_DOMAIN")
-            echo "  -> Generated $SEED_COUNT potential seeds for $ROOT_DOMAIN."
-            cat "$TEMP_SEED_LIST_DOMAIN" >> final-subdomain-list.txt
-          done < unique_root_domains.txt
-          
-          echo "INFO: Performing final de-duplication of the master seed list..."
-          mv final-subdomain-list.txt final-subdomain-list.tmp
-          sort -u final-subdomain-list.tmp > final-subdomain-list.txt
-          rm final-subdomain-list.tmp
-
-          FINAL_COUNT=$(wc -l < final-subdomain-list.txt)
-          echo "====================================================="
-          echo "SUCCESS: 'final-subdomain-list.txt' created with $FINAL_COUNT total unique seeds for permutation."
-          
-          rm -rf store-recon-temp
+         echo "INFO: Aggregating and aggressively sanitizing all results into a master list..."
+         if [ -d "store-recon-temp/results" ]; then
+               # 1) extract first token from each line (if puredns style) 
+               # 2) remove non-printable chars
+               # 3) normalize ALL whitespace into single newlines (guarantees one host per line)
+               find store-recon-temp/results -type f -name "puredns_result.txt" -exec awk '{print $1}' {} + \
+                 | sed 's/[^[:graph:][:space:]]//g' \
+                 | tr -s '[:space:]' '\n' \
+                 | sed '/^$/d' \
+                 > all-resolved-subdomains.txt
+         else
+               echo "WARNING: 'results' directory not found. Exiting."
+               exit 0
+         fi
+   
+         # debug info
+         wc -l store-recon-temp/results/af.mil/puredns_result.txt || true
+         head -n10 store-recon-temp/results/af.mil/puredns_result.txt || true
+         wc -l all-resolved-subdomains.txt
+   
+         if [ ! -s all-resolved-subdomains.txt ]; then
+               echo "WARNING: Master list 'all-resolved-subdomains.txt' is empty. Exiting."
+               exit 0
+         fi
+   
+         echo "INFO: Extracting unique root domains from the master list..."
+         dsieve -if all-resolved-subdomains.txt -f 2 | sort -u > unique_root_domains.txt
+   
+         > final-subdomain-list.txt
+         echo "INFO: Building smart seed list for each root domain..."
+         while read -r ROOT_DOMAIN; do
+           if [ -z "$ROOT_DOMAIN" ]; then continue; fi
+           echo "====================================================="
+           echo "Processing Root Domain: $ROOT_DOMAIN"
+   
+           TEMP_ROOT_LIST="${TMPDIR}/${ROOT_DOMAIN}-list.txt"
+           # match subdomains for this root (treat file as text)
+           grep -a -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" all-resolved-subdomains.txt --color=never > "$TEMP_ROOT_LIST" || true
+   
+           # debug
+           echo "TEMP_ROOT_LIST: $TEMP_ROOT_LIST"
+           wc -l "$TEMP_ROOT_LIST" || true
+           head -n 10 "$TEMP_ROOT_LIST" || true
+   
+           if [ ! -s "$TEMP_ROOT_LIST" ]; then
+               echo "WARNING: No subdomains found for '$ROOT_DOMAIN' after filtering. Skipping."
+               continue
+           fi
+   
+           TEMP_SEED_LIST_DOMAIN="${TMPDIR}/${ROOT_DOMAIN}-seeds.txt"
+           > "$TEMP_SEED_LIST_DOMAIN"
+   
+           # Prefer shuf -n to avoid head+SIGPIPE problems. Use '|| true' only for safety if 'anew' returns non-zero.
+           echo "  -> Getting a random 1000 sample from the top 2000 most common subdomains..."
+           # if file has fewer than 2000 lines, dsieve -top will return as many as available; shuf -n handles that.
+           dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf -n 1000 >> "$TEMP_SEED_LIST_DOMAIN" || true
+   
+           echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
+           # use tail -n +2001 to slice lines 2001..5000 safely (does nothing if fewer lines present)
+           dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n +2001 | shuf -n 500 >> "$TEMP_SEED_LIST_DOMAIN" || true
+   
+           # If you prefer using 'anew' to ensure we only append new lines, try:
+           # command -v anew >/dev/null 2>&1 && {
+           #   sort -u "$TEMP_SEED_LIST_DOMAIN" | anew -q "$TEMP_SEED_LIST_DOMAIN"
+           # }
+   
+           # cleanup duplicates for this domain
+           sort -u "$TEMP_SEED_LIST_DOMAIN" -o "$TEMP_SEED_LIST_DOMAIN"
+   
+           SEED_COUNT=$(wc -l < "$TEMP_SEED_LIST_DOMAIN")
+           echo "  -> Generated $SEED_COUNT potential seeds for $ROOT_DOMAIN."
+           cat "$TEMP_SEED_LIST_DOMAIN" >> final-subdomain-list.txt
+         done < unique_root_domains.txt
+   
+         echo "INFO: Performing final de-duplication of the master seed list..."
+         mv final-subdomain-list.txt final-subdomain-list.tmp
+         sort -u final-subdomain-list.tmp > final-subdomain-list.txt
+         rm final-subdomain-list.tmp
+         FINAL_COUNT=$(wc -l < final-subdomain-list.txt)
+         echo "====================================================="
+         echo "SUCCESS: 'final-subdomain-list.txt' created with $FINAL_COUNT total unique seeds for permutation."
+   
+         rm -rf store-recon-temp         
       
       - name: Process, Generate, and Filter Permutations with Dynamic Wordlists
         env:
