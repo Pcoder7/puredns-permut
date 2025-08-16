@@ -65,7 +65,7 @@ jobs:
               exit 0
           fi
           wc -l store-recon-temp/results/af.mil/puredns_result.txt
-          
+          head -n10 store-recon-temp/results/af.mil/puredns_result.txt
           wc -l all-resolved-subdomains.txt
           
           if [ ! -s all-resolved-subdomains.txt ]; then
