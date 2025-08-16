@@ -7,7 +7,7 @@ permissions:
 
 env:
   # --- Chunking and Distribution Configuration ---
-  LINES_PER_CHUNK: 10000 # Unchanged from original
+  LINES_PER_CHUNK: 35000 # Unchanged from original
   DISTRIBUTION_THRESHOLD: 4    # NEW: The minimum total chunks to trigger 3-way distribution
   PRIMARY_PERCENTAGE: 45        # NEW: 30% for the primary account
   SECONDARY_PERCENTAGE: 40      # NEW: 30% for the secondary account
