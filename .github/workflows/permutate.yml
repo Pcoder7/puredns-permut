@@ -1,3 +1,5 @@
+name: Distributed Recursive Enumeration
+
 on:
   workflow_dispatch:
 
