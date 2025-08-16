@@ -56,11 +56,12 @@ jobs:
           echo "INFO: Performing a fast, shallow clone of the results repository..."
           git clone --depth 1 "https://x-access-token:${STORE_RECON_PAT}@github.com/${ACCOUNT2_USERNAME}/${STORE}.git" store-recon-temp
           
-          echo "INFO: Aggregating and sanitizing all results into a master list..."
+          echo "INFO: Aggregating and aggressively sanitizing all results into a master list..."
           if [ -d "store-recon-temp/results" ]; then
-              # --- THIS IS THE CORRECTED LINE ---
-              # We pipe the output through `tr -d '\0'` to strip any null bytes that would corrupt the file.
-              find store-recon-temp/results -type f -name "puredns_result.txt" -exec awk '{print $1}' {} + | tr -d '\0' > all-resolved-subdomains.txt
+              # --- CHANGE 1: ROBUST SANITIZATION ---
+              # This pipeline now strips ALL non-printable characters, not just null bytes.
+              # 's/[^[:graph:][:space:]]//g' removes anything not a graphical character or whitespace.
+              find store-recon-temp/results -type f -name "puredns_result.txt" -exec awk '{print $1}' {} + | sed 's/[^[:graph:][:space:]]//g' > all-resolved-subdomains.txt
           else
               echo "WARNING: 'results' directory not found. Exiting."
               exit 0
@@ -82,9 +83,9 @@ jobs:
             echo "====================================================="
             echo "Processing Root Domain: $ROOT_DOMAIN"
             
-            # Create a temporary file containing only subdomains for the current root domain
             TEMP_ROOT_LIST="${TMPDIR}/${ROOT_DOMAIN}-list.txt"
-            # The `-a` or `--text` flag for grep forces it to treat the file as text, providing a safeguard.
+            # --- CHANGE 2: GREP SAFEGUARD ---
+            # The `-a` or `--text` flag forces grep to treat the file as text, preventing the "binary file matches" error here.
             grep -a -E "(^|\\.)${ROOT_DOMAIN//./\\.}(\$)" all-resolved-subdomains.txt --color=never > "$TEMP_ROOT_LIST" || true
 
             if [ ! -s "$TEMP_ROOT_LIST" ]; then
@@ -92,25 +93,20 @@ jobs:
                 continue
             fi
             
-            # This file will collect our seeds for THIS domain before we de-duplicate
             TEMP_SEED_LIST_DOMAIN="${TMPDIR}/${ROOT_DOMAIN}-seeds.txt"
             > "$TEMP_SEED_LIST_DOMAIN"
             
-            # --- Your Idea, Part 1: Random Sample of the Top-Tier ---
             echo "  -> Getting a random 1000 sample from the top 2000 most common subdomains..."
             dsieve -if "$TEMP_ROOT_LIST" -top 2000 | shuf | head -n 1000 | anew -q "$TEMP_SEED_LIST_DOMAIN"
             
-            # --- Your Idea, Part 2: Random Sample of the Mid-Tier ---
             echo "  -> Getting a random 500 sample from the 'mid-tier' (ranks 2001-5000)..."
             dsieve -if "$TEMP_ROOT_LIST" -top 5000 | tail -n 3000 | shuf | head -n 500 | anew -q "$TEMP_SEED_LIST_DOMAIN"
 
-            # --- Finalize for this domain ---
             SEED_COUNT=$(wc -l < "$TEMP_SEED_LIST_DOMAIN")
             echo "  -> Generated $SEED_COUNT potential seeds for $ROOT_DOMAIN."
             cat "$TEMP_SEED_LIST_DOMAIN" >> final-subdomain-list.txt
           done < unique_root_domains.txt
           
-          # Final de-duplication of the entire list to ensure it's perfectly clean
           echo "INFO: Performing final de-duplication of the master seed list..."
           mv final-subdomain-list.txt final-subdomain-list.tmp
           sort -u final-subdomain-list.tmp > final-subdomain-list.txt
@@ -120,9 +116,7 @@ jobs:
           echo "====================================================="
           echo "SUCCESS: 'final-subdomain-list.txt' created with $FINAL_COUNT total unique seeds for permutation."
           
-          # Clean up the cloned repository
           rm -rf store-recon-temp
-
       
       - name: Process, Generate, and Filter Permutations with Dynamic Wordlists
         env:
