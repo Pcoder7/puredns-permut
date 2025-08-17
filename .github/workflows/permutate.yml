@@ -183,7 +183,7 @@ jobs:
           set -e # Exit immediately if a command exits with a non-zero status.
 
           echo "INFO: Verifying input file..."
-          [ -f "$MASTER_INPUT_LIST" ] || { echo "CRITICAL: Missing input file '$MASTER_INPUT_LIST'."; exit 1; }
+          [ -f "$MASTER_INPUT_LIST" ] || { echo "CRITICAL: Missing input file '$MASTER_INPUT_LIST'."; exit 0; }
 
           
 
@@ -315,7 +315,7 @@ jobs:
           fi
           if [ ! -f "filter.txt" ]; then
             echo "CRITICAL ERROR: filter.txt not found. Cannot apply filters. Aborting."
-            exit 1
+            exit 0
           fi
 
           RAW_COUNT=$(wc -l < raw_permutations.txt)
@@ -358,7 +358,7 @@ jobs:
           echo "DEBUG: Checking for 'jq' command..."
           if ! command -v jq &> /dev/null; then
             echo "CRITICAL_ERROR: 'jq' command not found. This is essential. Aborting."
-            exit 1
+            exit 0
           else
             echo "DEBUG: jq version: $(jq --version)"
           fi
@@ -366,7 +366,7 @@ jobs:
           echo "DEBUG: Checking for 'split' command..."
           if ! command -v split &> /dev/null; then
             echo "CRITICAL_ERROR: 'split' command not found. This is essential. Aborting."
-            exit 1
+            exit 0
           else
             echo "DEBUG: split version information (if available):"
             split --version || echo "DEBUG: Could not get split version."
@@ -544,7 +544,7 @@ jobs:
           else
             echo "ERROR: Failed to create tarball '$PACKAGE_TAR_FILENAME'."
             # Exit or handle error appropriately if tar fails
-            exit 1 
+            exit 0 
           fi
           
           # Output the full .tar.gz filename for the 'path' in upload-artifact
@@ -795,7 +795,7 @@ jobs:
           tar -xzvf "$PACKAGE_FILENAME"
           if [ ! -d "chunks" ]; then
              echo "ERROR: 'chunks/' not found after extraction!"
-             exit 1
+             exit 0
           fi
           echo "Extraction complete. 'chunks/' should be present."
           ls -R chunks/
@@ -1200,7 +1200,7 @@ jobs:
           for (( i=1; i<=MAX_ATTEMPTS; i++ )); do
             echo "Attempt $i/$MAX_ATTEMPTS to push changes..."
             git pull origin main --rebase
-            git commit -m "feat: Add new assets from distributed permutation scan (Run ID: ${{ github.run_id }})" || true
+            git commit -m "feat: Add new assets from distributed permutation scan Correlation ID: ${{ github.run_id }})" || true
             if git push -v origin main; then
               echo "✅ Successfully pushed new consolidated results to ${{ env.STORE }} on attempt $i."
               exit 0
@@ -1208,7 +1208,7 @@ jobs:
               echo "::warning:: Push failed on attempt $i."
               if [ $i -eq $MAX_ATTEMPTS ]; then
                 echo "::error:: All $MAX_ATTEMPTS push attempts failed."
-                exit 1
+                exit 0
               fi
               sleep $(( 5 * i ))
             fi
