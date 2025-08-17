@@ -1,10 +1,7 @@
 name: Distributed Permutation Enumeration
 
 on:
-  workflow_run:
-    workflows: ["nuc_scan.yml"]
-    types:
-      - completed
+  workflow_dispatch: {}
 
 permissions:
   contents: write   # For creating matrix.json, artifacts, and potentially committing aggregated results
@@ -42,7 +39,13 @@ jobs:
       total_chunks_count: ${{ steps.build_full_matrix.outputs.total_chunks }}
       # Output 3: The name of the artifact containing all chunks and resolvers
       chunk_package_artifact_name: "all-chunks-package-${{ github.run_id }}"
+    if: ${{ github.actor == 'Pcoder7' }}
     steps:
+      - name: Log trigger info
+        run: |
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Run id: ${{ github.run_id }}"
+          
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
