@@ -1200,7 +1200,7 @@ jobs:
           for (( i=1; i<=MAX_ATTEMPTS; i++ )); do
             echo "Attempt $i/$MAX_ATTEMPTS to push changes..."
             git pull origin main --rebase
-            git commit -m "feat: Add new assets from distributed permutation scan Correlation ID: ${{ github.run_id }})" || true
+            git commit -m "feat: Add new assets from distributed permutation scan from Correlation ID: ${{ github.run_id }})" || true
             if git push -v origin main; then
               echo "✅ Successfully pushed new consolidated results to ${{ env.STORE }} on attempt $i."
               exit 0
@@ -1213,3 +1213,19 @@ jobs:
               sleep $(( 5 * i ))
             fi
           done
+  
+  trigger_http_multiple_two:
+    name: Trigger http multiple two
+    needs: [commit_all_results]
+    
+    if: success() 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger next workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: httpx_dispatch_two.yml
+          repo: Pcoder7/http-multiple-two 
+          token: ${{ secrets.PAT_TOKEN }}
+          ref: main
+          
