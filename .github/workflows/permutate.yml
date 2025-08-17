@@ -1,7 +1,10 @@
-name: Distributed Recursive Enumeration
+name: Distributed Permutation Enumeration
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["nuc_scan.yml"]
+    types:
+      - completed
 
 permissions:
   contents: write   # For creating matrix.json, artifacts, and potentially committing aggregated results
@@ -9,7 +12,7 @@ permissions:
 
 env:
   # --- Chunking and Distribution Configuration ---
-  LINES_PER_CHUNK: 30000 # Unchanged from original
+  LINES_PER_CHUNK: 25000 # Unchanged from original
   DISTRIBUTION_THRESHOLD: 15    # NEW: The minimum total chunks to trigger 3-way distribution
   PRIMARY_PERCENTAGE: 45        # NEW: 30% for the primary account
   SECONDARY_PERCENTAGE: 40      # NEW: 30% for the secondary account
