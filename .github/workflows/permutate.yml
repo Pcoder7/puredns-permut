@@ -1245,7 +1245,7 @@ jobs:
       - name: Trigger next workflow
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: httpx_dispatch_two.yml
+          workflow: http_dispatch_two.yml
           repo: Pcoder7/http-multiple-two 
           token: ${{ secrets.PAT_TOKEN }}
           ref: main
