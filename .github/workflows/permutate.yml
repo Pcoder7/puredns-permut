@@ -1249,4 +1249,5 @@ jobs:
           repo: Pcoder7/http-multiple-two 
           token: ${{ secrets.PAT_TOKEN }}
           ref: main
-          
+
+          inputs: '{ "run_id": "${{ github.run_id }}", "results_repo": "${{ github.repository }}" }'
