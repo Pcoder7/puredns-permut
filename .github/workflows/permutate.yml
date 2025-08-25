@@ -1119,7 +1119,7 @@ jobs:
   commit_all_results:
     name: Commit All Results
     needs: merge_results
-    if: needs.merge_results.outputs.has_results == 'true'
+    if: always() && needs.merge_results.outputs.has_results == 'true'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/pcoder7/spider-puredns-actions:latest
@@ -1239,7 +1239,7 @@ jobs:
     name: Trigger http multiple two
     needs: [commit_all_results]
     
-    if: success() 
+    if: always 
     runs-on: ubuntu-latest
     steps:
       - name: Trigger next workflow
