@@ -1264,8 +1264,7 @@ jobs:
   trigger_http_multiple_two:
     name: Trigger http multiple two
     needs: [commit_all_results]
-    
-    if: always 
+    if: always() 
     runs-on: ubuntu-latest
     steps:
       - name: Trigger next workflow
