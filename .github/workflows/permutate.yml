@@ -872,6 +872,7 @@ jobs:
           # The chunk file from the matrix is treated as the raw input
           RAW_RESULTS_FILE="${{ matrix.pair.chunk }}"
           PUREDNS_FILE="puredns_file.txt"
+          WILDCARD_FILE="wildcard_file.txt"
           RESOLVED_FILE="puredns_resolved.txt"
           TMP_CLEANMASSDNS=$(mktemp)
           MASSDNS="massdns.txt"
@@ -890,14 +891,23 @@ jobs:
             -r resolvers.txt \
             --rate-limit 3000 \
             --skip-validation \
-            --skip-wildcard-filter \
+            --wildcard-tests 300 \
+            --wilcard-batch 100000 \
             --write "$PUREDNS_FILE" \
+            --write-wildcards "WILDCARD_FILE" \
             --write-massdns "$MASSDNS" \
             --quiet >/dev/null 2>&1
                                
           echo "✅ PureDNS resolution complete. $(wc -l < "$PUREDNS_FILE") subdomains were successfully resolved."
           
           # Scoping is now applied *after* resolution
+          
+          echo "✅ Downloading .scope file from recon-automation repo"
+
+          wget -qO .scope https://raw.githubusercontent.com/Pcoder7/recon-automation/refs/heads/main/.scope 
+
+          echo  " $(wc -l < .scope) lines of scope file is downloaded " 
+          
           cat "$PUREDNS_FILE" | inscope -s .scope > "$RESOLVED_FILE" || true
           
           # Also scope the massdns results to ensure A-records are for target domains
