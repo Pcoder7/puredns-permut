@@ -892,7 +892,7 @@ jobs:
             --rate-limit 3000 \
             --skip-validation \
             --wildcard-tests 300 \
-            --wilcard-batch 100000 \
+            --wildcard-batch 100000 \
             --write "$PUREDNS_FILE" \
             --write-wildcards "WILDCARD_FILE" \
             --write-massdns "$MASSDNS" \
